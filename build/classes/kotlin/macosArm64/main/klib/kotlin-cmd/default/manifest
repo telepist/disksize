@@ -1,0 +1,10 @@
+abi_version=2.2.0
+builtins_platform=NATIVE
+compiler_version=2.2.20
+depends=stdlib org.jetbrains.kotlinx\:atomicfu-cinterop-interop org.jetbrains.kotlinx\:atomicfu org.jetbrains.kotlinx\:kotlinx-coroutines-core androidx.annotation\:annotation androidx.lifecycle\:lifecycle-common androidx.lifecycle\:lifecycle-runtime androidx.collection\:collection org.jetbrains.compose.runtime\:runtime org.jetbrains.androidx.lifecycle\:lifecycle-runtime-compose cite\:cite-api dev.drewhamilton.poko\:poko-annotations com.jakewharton.mosaic\:mosaic-terminal com.jakewharton.finalization\:finalization-hook com.jakewharton.mosaic\:mosaic-tty-cinterop-mosaic com.jakewharton.mosaic\:mosaic-tty com.jakewharton.mosaic\:mosaic-tty-terminal kotlin-codepoints-parent\:kotlin-codepoints com.jakewharton.mosaic\:mosaic-runtime
+ir_signature_versions=1,2
+language_features=+MultiPlatformProjects
+metadata_version=1.4.1
+native_targets=macos_arm64
+short_name=kotlin-cmd
+unique_name=kotlin-cmd

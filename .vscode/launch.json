@@ -1,0 +1,52 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug macOS ARM64",
+            "program": "${workspaceFolder}/build/bin/macosArm64/debugExecutable/kotlinHello.kexe",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "Build Debug macOS ARM64"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug macOS x64",
+            "program": "${workspaceFolder}/build/bin/macosX64/debugExecutable/kotlinHello.kexe",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "Build Debug macOS x64"
+        },
+        {
+            "type": "cppdbg",
+            "request": "launch",
+            "name": "Debug Linux x64",
+            "program": "${workspaceFolder}/build/bin/linuxX64/debugExecutable/kotlinHello.kexe",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "MIMode": "gdb",
+            "preLaunchTask": "Build Debug Linux x64"
+        },
+        {
+            "type": "cppdbg",
+            "request": "launch",
+            "name": "Debug Linux ARM64",
+            "program": "${workspaceFolder}/build/bin/linuxArm64/debugExecutable/kotlinHello.kexe",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "MIMode": "gdb",
+            "preLaunchTask": "Build Debug Linux ARM64"
+        },
+        {
+            "type": "cppvsdbg",
+            "request": "launch",
+            "name": "Debug Windows x64",
+            "program": "${workspaceFolder}/build/bin/mingwX64/debugExecutable/kotlinHello.exe",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "Build Debug Windows x64"
+        }
+    ]
+}
