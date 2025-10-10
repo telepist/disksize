@@ -12,8 +12,12 @@ data class ExplorerState(
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
     val selectedIndex: Int = 0,
-    val sortOrder: SortOrder = SortOrder.SIZE_DESC
+    val sortOrder: SortOrder = SortOrder.SIZE_DESC,
+    val spinnerIndex: Int = 0
 ) {
+    val spinnerFrame: Char
+        get() = SPINNER_FRAMES[spinnerIndex % SPINNER_FRAMES.size]
+
     val directories: List<FileNode> =
         scanResult
             ?.rootNode
@@ -55,7 +59,8 @@ fun ExplorerState.withScanResult(scanResult: ScanResult): ExplorerState {
     val updated = copy(
         scanResult = scanResult,
         isLoading = false,
-        errorMessage = null
+        errorMessage = null,
+        spinnerIndex = 0
     )
     val newDirectories = updated.directories
     val newIndex = previousSelectedPath?.let { path ->
@@ -70,7 +75,8 @@ fun ExplorerState.withLoading(path: String): ExplorerState {
         isLoading = true,
         errorMessage = null,
         scanResult = null,
-        selectedIndex = 0
+        selectedIndex = 0,
+        spinnerIndex = 0
     )
 }
 
@@ -79,7 +85,8 @@ fun ExplorerState.withError(message: String): ExplorerState {
         isLoading = false,
         errorMessage = message,
         scanResult = null,
-        selectedIndex = 0
+        selectedIndex = 0,
+        spinnerIndex = 0
     )
 }
 
@@ -94,6 +101,8 @@ fun ExplorerState.withNextSortOrder(): ExplorerState {
     return updated.copy(selectedIndex = newIndex)
 }
 
+fun ExplorerState.tickSpinner(): ExplorerState = copy(spinnerIndex = spinnerIndex + 1)
+
 enum class SortOrder(val label: String) {
     SIZE_DESC("Size ↓"),
     NAME_ASC("Name ↑"),
@@ -105,3 +114,5 @@ enum class SortOrder(val label: String) {
         DATE_DESC -> SIZE_DESC
     }
 }
+
+private val SPINNER_FRAMES = "|/-\\".toCharArray()

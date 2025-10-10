@@ -15,10 +15,12 @@ import disksize.presentation.withLoading
 import disksize.presentation.withScanResult
 import disksize.presentation.withSelection
 import disksize.presentation.withNextSortOrder
+import disksize.presentation.tickSpinner
 import disksize.util.normalizePath
 import disksize.util.parentPath
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlin.system.exitProcess
 
 @Composable
@@ -51,21 +53,31 @@ fun DiskSizeApp(
         )
     }
 
-    val directories = state.directories
+    LaunchedEffect(state.isLoading, reloadTrigger) {
+        if (state.isLoading) {
+            while (true) {
+                delay(120)
+                if (!state.isLoading) break
+                state = state.tickSpinner()
+            }
+        }
+    }
 
     MainScreen(
         state = state,
         onMoveSelection = { delta ->
-            if (directories.isEmpty()) return@MainScreen
+            val dirs = state.directories
+            if (dirs.isEmpty()) return@MainScreen
             val next = state.selectedIndex + delta
-            val bounded = next.coerceIn(0, directories.lastIndex)
+            val bounded = next.coerceIn(0, dirs.lastIndex)
             if (bounded != state.selectedIndex) {
                 state = state.withSelection(bounded)
             }
         },
         onOpenSelected = {
-            if (state.isLoading || directories.isEmpty()) return@MainScreen
-            val selected = directories.getOrNull(state.selectedIndex) ?: return@MainScreen
+            val dirs = state.directories
+            if (state.isLoading || dirs.isEmpty()) return@MainScreen
+            val selected = dirs.getOrNull(state.selectedIndex) ?: return@MainScreen
             currentPath = normalizePath(selected.path)
             reloadTrigger++
         },

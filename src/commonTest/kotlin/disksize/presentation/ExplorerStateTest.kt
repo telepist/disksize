@@ -37,6 +37,7 @@ class ExplorerStateTest {
         assertEquals(listOf("b", "c", "a"), names)
         assertEquals(0, updated.selectedIndex)
         assertEquals(600, updated.totalSize)
+        assertEquals(0, updated.spinnerIndex)
     }
 
     @Test
@@ -116,6 +117,15 @@ class ExplorerStateTest {
 
         assertEquals(1, state.warningCount)
         assertFalse(state.scanResult!!.isSuccessful())
+    }
+
+    @Test
+    fun `spinner advances while loading`() {
+        var state = ExplorerState(currentPath = "/tmp").withLoading("/tmp")
+        state = state.tickSpinner()
+        assertEquals(1, state.spinnerIndex)
+        val nextFrame = state.spinnerFrame
+        assertTrue(nextFrame in charArrayOf('|', '/', '-', '\\'))
     }
 
     private fun directory(

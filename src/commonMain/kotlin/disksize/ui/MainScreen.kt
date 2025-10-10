@@ -10,7 +10,6 @@ import com.jakewharton.mosaic.ui.Row
 import com.jakewharton.mosaic.ui.Text
 import disksize.domain.model.FileNode
 import disksize.presentation.ExplorerState
-import disksize.presentation.SortOrder
 import disksize.util.SizeFormatter
 
 /**
@@ -40,14 +39,7 @@ fun MainScreen(
         HeaderBar()
         PathBar(state.currentPath)
         Statistics(state)
-        DirectoryList(
-            directories = state.directories,
-            selectedIndex = state.selectedIndex,
-            isLoading = state.isLoading,
-            errorMessage = state.errorMessage,
-            sortOrder = state.sortOrder,
-            warningCount = state.warningCount
-        )
+        DirectoryList(state)
         StatusBar(state)
     }
 }
@@ -127,22 +119,20 @@ private fun Statistics(state: ExplorerState) {
 }
 
 @Composable
-private fun DirectoryList(
-    directories: List<FileNode>,
-    selectedIndex: Int,
-    isLoading: Boolean,
-    errorMessage: String?,
-    sortOrder: SortOrder,
-    warningCount: Int
-) {
-    val headerTitle = "Subdirectories (Sort: ${sortOrder.label})"
-    Text(sectionHeader(headerTitle))
+private fun DirectoryList(state: ExplorerState) {
+    val directories = state.directories
+    Text(sectionHeader("Subdirectories (Sort: ${state.sortOrder.label})"))
     Text("║  ┌────────────────────────────────────────────────────┐    ║")
 
     when {
-        isLoading -> Text(contentLine("Scanning..."))
-        errorMessage != null -> {
-            val message = "ERROR: ${errorMessage.take(46)}"
+        state.isLoading -> {
+            val pathLine = "Scanning ${state.spinnerFrame} ${shortenPath(state.currentPath, 40)}"
+            Text(contentLine(pathLine))
+            Text(contentLine("Progress: [${loadingProgress(state.spinnerIndex)}]"))
+            Text(contentLine("Collecting directory statistics..."))
+        }
+        state.errorMessage != null -> {
+            val message = "ERROR: ${state.errorMessage.take(46)}"
             Text(contentLine(message))
         }
         directories.isEmpty() -> {
@@ -151,6 +141,7 @@ private fun DirectoryList(
         else -> {
             val maxVisible = 10
             val totalCount = directories.size
+            val selectedIndex = state.selectedIndex
             val windowStart = when {
                 totalCount <= maxVisible -> 0
                 selectedIndex < maxVisible -> 0
@@ -177,8 +168,8 @@ private fun DirectoryList(
         }
     }
 
-    if (warningCount > 0) {
-        val warningText = "Warnings: $warningCount item(s) skipped"
+    if (state.warningCount > 0 && !state.isLoading) {
+        val warningText = "Warnings: ${state.warningCount} item(s) skipped"
         Text(contentLine(warningText))
     }
 
@@ -196,6 +187,22 @@ private fun contentLine(text: String): String {
     val innerWidth = 54
     val padded = text.padEnd(innerWidth)
     return "║  │ ${padded.take(innerWidth)}│   ║"
+}
+
+private const val PROGRESS_BAR_WIDTH = 20
+
+private fun loadingProgress(step: Int): String {
+    val range = PROGRESS_BAR_WIDTH * 2
+    val pulse = step % range
+    val filled = if (pulse <= PROGRESS_BAR_WIDTH) pulse else range - pulse
+    val safeFilled = filled.coerceIn(0, PROGRESS_BAR_WIDTH)
+    return "█".repeat(safeFilled) + "░".repeat(PROGRESS_BAR_WIDTH - safeFilled)
+}
+
+private fun shortenPath(path: String, maxLength: Int): String {
+    if (path.length <= maxLength) return path
+    if (maxLength <= 3) return path.take(maxLength)
+    return "..." + path.takeLast(maxLength - 3)
 }
 
 @Composable
@@ -249,43 +256,40 @@ private fun DirectoryItem(node: FileNode, totalParentSize: Long, isSelected: Boo
 private fun StatusBar(state: ExplorerState) {
     Text("╠═════════════════════════════════════════════════════════════╣", color = Color.Cyan)
 
-    val statusMsg = when {
-        state.isLoading -> "[Scanning...]"
-        state.errorMessage != null -> "[${state.errorMessage.take(36)}]"
-        state.scanResult != null -> {
-            val seconds = state.scanDurationMs / 1000.0
-            val warningSuffix = if (state.warningCount > 0) " with ${state.warningCount} warning(s)" else ""
-            "[Scan completed in ${formatDuration(seconds)}s$warningSuffix]"
-        }
-        else -> "[Idle]"
-    }
-
-    val selected = state.selectedDirectory
-    val selectedSummary = selected?.let {
-        val size = SizeFormatter.format(it.totalSize())
-        "${it.name} ($size)"
-    } ?: "--"
-    val sortSummary = state.sortOrder.label
-    val warningsInfo = if (state.warningCount > 0 && state.errorMessage == null) {
-        " ⚠${state.warningCount}"
-    } else {
-        ""
-    }
-
     Row {
         Text("║ ", color = Color.Cyan)
-        val statusColor = when {
-            state.errorMessage != null -> Color.Red
-            state.isLoading -> Color.Yellow
-            else -> Color.Green
-        }
-        Text(statusMsg, color = statusColor)
-        Text("  ", color = Color.Cyan)
-        Text("Sort: $sortSummary", color = Color.Cyan)
-        Text("  ", color = Color.Cyan)
-        Text("Selected: $selectedSummary", color = Color.Green)
-        if (warningsInfo.isNotEmpty()) {
-            Text(warningsInfo, color = Color.Yellow)
+        if (state.isLoading) {
+            val statusMsg = "[Scanning ${state.spinnerFrame}]"
+            val pathInfo = shortenPath(state.currentPath, 32)
+            Text(statusMsg, color = Color.Yellow)
+            Text("  Path: $pathInfo", color = Color.Cyan)
+        } else {
+            val statusMsg = when {
+                state.errorMessage != null -> "[${state.errorMessage.take(36)}]"
+                state.scanResult != null -> {
+                    val seconds = state.scanDurationMs / 1000.0
+                    val warningSuffix = if (state.warningCount > 0) " with ${state.warningCount} warning(s)" else ""
+                    "[Scan completed in ${formatDuration(seconds)}s$warningSuffix]"
+                }
+                else -> "[Idle]"
+            }
+            val statusColor = when {
+                state.errorMessage != null -> Color.Red
+                state.scanResult != null -> Color.Green
+                else -> Color.Cyan
+            }
+            val selected = state.selectedDirectory
+            val selectedSummary = selected?.let {
+                val size = SizeFormatter.format(it.totalSize())
+                "${it.name} ($size)"
+            } ?: "--"
+
+            Text(statusMsg, color = statusColor)
+            Text("  Sort: ${state.sortOrder.label}", color = Color.Cyan)
+            Text("  Selected: $selectedSummary", color = Color.Green)
+            if (state.warningCount > 0 && state.errorMessage == null) {
+                Text(" ⚠${state.warningCount}", color = Color.Yellow)
+            }
         }
         Text("  q: Quit", color = Color.Yellow)
         Text(" ║", color = Color.Cyan)
