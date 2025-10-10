@@ -45,11 +45,11 @@ run-release: build-release
 
 # Run all tests
 test:
-	./gradlew test
+	./gradlew macosArm64Test
 
 # Run tests and generate coverage report
 test-coverage:
-	./gradlew test koverHtmlReport
+	./gradlew macosArm64Test koverHtmlReport
 	@echo "Coverage report generated at build/reports/kover/html/index.html"
 
 # Clean build artifacts
