@@ -1,20 +1,23 @@
 package disksize.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import com.jakewharton.mosaic.LocalTerminalState
 import com.jakewharton.mosaic.layout.KeyEvent
 import com.jakewharton.mosaic.layout.onKeyEvent
 import com.jakewharton.mosaic.modifier.Modifier
-import com.jakewharton.mosaic.ui.Color
 import com.jakewharton.mosaic.ui.Column
-import com.jakewharton.mosaic.ui.Row
 import com.jakewharton.mosaic.ui.Text
 import disksize.domain.model.FileNode
 import disksize.presentation.ExplorerState
 import disksize.util.SizeFormatter
+import kotlin.math.max
+import kotlin.math.roundToInt
 
-/**
- * Main screen composable for DiskSize TUI with interactive navigation.
- */
+private const val MIN_WIDTH = 48
+private const val MIN_ROWS = 16
+private const val PROGRESS_BAR_TARGET = 24
+
 @Composable
 fun MainScreen(
     state: ExplorerState,
@@ -24,6 +27,14 @@ fun MainScreen(
     onCycleSort: () -> Unit,
     onQuit: () -> Unit
 ) {
+    val terminalState = LocalTerminalState.current
+    val frameWidth = max(MIN_WIDTH, terminalState?.size?.columns ?: 80)
+    val frameRows = max(MIN_ROWS, terminalState?.size?.rows ?: 24)
+
+    val screenLines = remember(state, frameWidth, frameRows) {
+        buildScreenLines(state, frameWidth, frameRows)
+    }
+
     Column(
         modifier = Modifier.onKeyEvent { event ->
             handleKey(
@@ -36,11 +47,7 @@ fun MainScreen(
             )
         }
     ) {
-        HeaderBar()
-        PathBar(state.currentPath)
-        Statistics(state)
-        DirectoryList(state)
-        StatusBar(state)
+        screenLines.forEach { line -> Text(line) }
     }
 }
 
@@ -54,248 +61,201 @@ private fun handleKey(
 ): Boolean {
     return when (event.key) {
         "ArrowDown", "j" -> {
-            moveSelection(1); true
+            moveSelection(1)
+            true
         }
         "ArrowUp", "k" -> {
-            moveSelection(-1); true
+            moveSelection(-1)
+            true
         }
         "Enter", "ArrowRight", "l" -> {
-            openSelected(); true
+            openSelected()
+            true
         }
         "Backspace", "ArrowLeft", "h" -> {
-            navigateUp(); true
+            navigateUp()
+            true
         }
         "s", "S" -> {
-            cycleSort(); true
+            cycleSort()
+            true
         }
         "q", "Q" -> {
-            quit(); true
+            quit()
+            true
         }
         else -> false
     }
 }
 
-@Composable
-private fun HeaderBar() {
-    Text("╔═════════════════════════════════════════════════════════════╗", color = Color.Cyan)
-    Text("║ DiskSize - Disk Space Analyzer                              ║", color = Color.Cyan)
-    Text("╠═════════════════════════════════════════════════════════════╣", color = Color.Cyan)
+private fun buildScreenLines(state: ExplorerState, width: Int, rows: Int): List<String> {
+    val lines = mutableListOf<String>()
+    lines += topBorder(width)
+    lines += frameLineCentered(width, "DiskSize - Disk Space Analyzer")
+    lines += middleBorder(width)
+    lines += frameLine(width, "Path: ${shortenPath(state.currentPath, width - 8)}")
+    lines += blankLine(width)
+    lines += statsLines(state, width)
+    lines += blankLine(width)
+    lines += directoryLines(state, width)
+
+    val reservedForStatus = 3 // divider, status, bottom border
+    val fillerCount = rows - (lines.size + reservedForStatus)
+    if (fillerCount > 0) {
+        repeat(fillerCount) { lines += blankLine(width) }
+    }
+
+    lines += middleBorder(width)
+    lines += statusLine(state, width)
+    lines += bottomBorder(width)
+    return lines
 }
 
-@Composable
-private fun PathBar(path: String) {
-    val truncatedPath = if (path.length > 56) {
-        "..." + path.takeLast(53)
-    } else {
-        path
-    }
-    Text("║ Path: $truncatedPath${" ".repeat(56 - truncatedPath.length)}║", color = Color.Cyan)
-    Text("╠═════════════════════════════════════════════════════════════╣", color = Color.Cyan)
+private fun statsLines(state: ExplorerState, width: Int): List<String> {
+    val totalSize = state.scanResult?.let { SizeFormatter.format(it.totalSize) } ?: "--"
+    val fileCount = state.scanResult?.fileCount?.toString() ?: "--"
+    val directoryCount = state.scanResult?.directoryCount?.toString() ?: "--"
+    return listOf(
+        frameLine(width, "Total Size: $totalSize"),
+        frameLine(width, "Files: $fileCount"),
+        frameLine(width, "Directories: $directoryCount")
+    )
 }
 
-@Composable
-private fun Statistics(state: ExplorerState) {
-    val totalSize = if (state.scanResult != null) {
-        SizeFormatter.format(state.totalSize).padEnd(48)
-    } else {
-        "--".padEnd(48)
-    }
-    val files = if (state.scanResult != null) {
-        state.fileCount.toString().padEnd(53)
-    } else {
-        "--".padEnd(53)
-    }
-    val directories = if (state.scanResult != null) {
-        state.directoryCount.toString().padEnd(48)
-    } else {
-        "--".padEnd(48)
-    }
-
-    Text("║                                                             ║")
-    Text("║  Total Size: $totalSize║")
-    Text("║  Files: $files║")
-    Text("║  Directories: $directories║")
-    Text("║                                                             ║")
-}
-
-@Composable
-private fun DirectoryList(state: ExplorerState) {
-    val directories = state.directories
-    Text(sectionHeader("Subdirectories (Sort: ${state.sortOrder.label})"))
-    Text("║  ┌────────────────────────────────────────────────────┐    ║")
+private fun directoryLines(state: ExplorerState, width: Int): List<String> {
+    val innerWidth = width - 2
+    val lines = mutableListOf<String>()
+    lines += frameLine(width, "Directories (Sort: ${state.sortOrder.label})")
 
     when {
         state.isLoading -> {
-            val pathLine = "Scanning ${state.spinnerFrame} ${shortenPath(state.currentPath, 40)}"
-            Text(contentLine(pathLine))
-            Text(contentLine("Progress: [${loadingProgress(state.spinnerIndex)}]"))
-            Text(contentLine("Collecting directory statistics..."))
+            val pathLine = "Scanning ${state.spinnerFrame} ${shortenPath(state.currentPath, innerWidth - 12)}"
+            val barWidth = max(4, innerWidth - "Progress: ".length - 2)
+            lines += frameLine(width, pathLine)
+            lines += frameLine(width, "Progress: ${loadingProgress(state.spinnerIndex, barWidth)}")
+            lines += frameLine(width, "Collecting directory statistics...")
         }
         state.errorMessage != null -> {
-            val message = "ERROR: ${state.errorMessage.take(46)}"
-            Text(contentLine(message))
+            val message = state.errorMessage.take(innerWidth - 2)
+            lines += frameLine(width, "Error: $message")
         }
-        directories.isEmpty() -> {
-            Text(contentLine("(no subdirectories found)"))
+        state.directories.isEmpty() -> {
+            lines += frameLine(width, "(no subdirectories found)")
         }
         else -> {
-            val maxVisible = 10
-            val totalCount = directories.size
-            val selectedIndex = state.selectedIndex
-            val windowStart = when {
-                totalCount <= maxVisible -> 0
-                selectedIndex < maxVisible -> 0
-                selectedIndex >= totalCount - maxVisible -> (totalCount - maxVisible).coerceAtLeast(0)
-                else -> selectedIndex - maxVisible / 2
+            val totalSize = state.directories.sumOf { it.totalSize() }.coerceAtLeast(1L)
+            state.directories.forEachIndexed { index, node ->
+                lines += directoryLine(width, node, totalSize, index == state.selectedIndex)
             }
-            val windowEnd = (windowStart + maxVisible).coerceAtMost(totalCount)
-            val visible = directories.subList(windowStart, windowEnd)
-            val totalSize = directories.sumOf { it.totalSize() }.coerceAtLeast(1L)
-
-            if (windowStart > 0) {
-                Text(contentLine("... (more above)"))
-            }
-
-            visible.forEachIndexed { index, node ->
-                val absoluteIndex = windowStart + index
-                val isSelected = absoluteIndex == selectedIndex
-                DirectoryItem(node, totalSize, isSelected)
-            }
-
-            if (windowEnd < totalCount) {
-                Text(contentLine("... (more below)"))
+            if (state.warningCount > 0) {
+                lines += frameLine(width, "Warnings: ${state.warningCount} item(s) skipped")
             }
         }
     }
 
-    if (state.warningCount > 0 && !state.isLoading) {
-        val warningText = "Warnings: ${state.warningCount} item(s) skipped"
-        Text(contentLine(warningText))
+    return lines
+}
+
+private fun directoryLine(width: Int, node: FileNode, totalParentSize: Long, isSelected: Boolean): String {
+    val innerWidth = width - 2
+    val selector = if (isSelected) ">" else " "
+    val nameWithType = (if (node.isDirectory) "${node.name}/" else node.name)
+    val size = SizeFormatter.format(node.totalSize())
+    val percentage = if (totalParentSize > 0) node.totalSize().toDouble() / totalParentSize * 100 else 0.0
+    val percentStr = formatPercentage(percentage)
+    val sizePart = "$size (${percentStr}%)"
+
+    val availableForBar = innerWidth - sizePart.length - 4
+    val barWidth = max(0, minOf(PROGRESS_BAR_TARGET, availableForBar / 2))
+    val availableForLabel = innerWidth - sizePart.length - barWidth - 3
+    val truncatedLabel = truncateWithEllipsis("$selector $nameWithType", max(0, availableForLabel))
+
+    val barSegment = if (barWidth > 0) {
+        " " + usageBar(barWidth, percentage, isSelected)
+    } else ""
+
+    val content = "$truncatedLabel $sizePart$barSegment"
+    return frameLine(width, content)
+}
+
+private fun usageBar(width: Int, percentage: Double, highlight: Boolean): String {
+    if (width <= 0) return ""
+    val filled = (percentage / 100.0 * width).roundToInt().coerceIn(0, width)
+    val fillChar = if (highlight) '█' else '▓'
+    val emptyChar = '░'
+    return "".padEnd(filled, fillChar) + "".padEnd(width - filled, emptyChar)
+}
+
+private fun statusLine(state: ExplorerState, width: Int): String {
+    val innerWidth = width - 2
+    val content = when {
+        state.isLoading -> {
+            "Scanning ${state.spinnerFrame} ${shortenPath(state.currentPath, innerWidth - 12)}"
+        }
+        state.errorMessage != null -> {
+            "Error: ${state.errorMessage.take(innerWidth - 7)}"
+        }
+        state.scanResult != null -> {
+            val seconds = state.scanDurationMs / 1000.0
+            val base = "Scan completed in ${formatDuration(seconds)}s"
+            val warnings = if (state.warningCount > 0) " • ${state.warningCount} warning(s)" else ""
+            val selected = state.selectedDirectory?.let {
+                val size = SizeFormatter.format(it.totalSize())
+                val name = shortenPath(it.name, innerWidth - base.length - warnings.length - 12)
+                " • Selected: $name ($size)"
+            } ?: ""
+            base + warnings + selected
+        }
+        else -> "Idle"
     }
-
-    Text("║  └────────────────────────────────────────────────────┘   ║")
-    Text("║                                                             ║")
+    return frameLine(width, content)
 }
 
-private fun sectionHeader(title: String): String {
-    val innerWidth = 55
-    val padded = title.padEnd(innerWidth)
-    return "║  ${padded.take(innerWidth)} ║"
+private fun topBorder(width: Int) = "╔" + "═".repeat(width - 2) + "╗"
+private fun middleBorder(width: Int) = "╠" + "═".repeat(width - 2) + "╣"
+private fun bottomBorder(width: Int) = "╚" + "═".repeat(width - 2) + "╝"
+private fun blankLine(width: Int) = frameLine(width, "")
+
+private fun frameLine(width: Int, content: String): String {
+    val innerWidth = width - 2
+    val padded = content.padEnd(innerWidth)
+    return "║" + padded.take(innerWidth) + "║"
 }
 
-private fun contentLine(text: String): String {
-    val innerWidth = 54
-    val padded = text.padEnd(innerWidth)
-    return "║  │ ${padded.take(innerWidth)}│   ║"
+private fun frameLineCentered(width: Int, content: String): String {
+    val innerWidth = width - 2
+    val truncated = content.take(innerWidth)
+    val padding = max(0, (innerWidth - truncated.length) / 2)
+    val centered = " ".repeat(padding) + truncated + " ".repeat(innerWidth - padding - truncated.length)
+    return "║" + centered + "║"
 }
 
-private const val PROGRESS_BAR_WIDTH = 20
-
-private fun loadingProgress(step: Int): String {
-    val range = PROGRESS_BAR_WIDTH * 2
+private fun loadingProgress(step: Int, barWidth: Int): String {
+    if (barWidth <= 0) return "[]"
+    val range = barWidth * 2
     val pulse = step % range
-    val filled = if (pulse <= PROGRESS_BAR_WIDTH) pulse else range - pulse
-    val safeFilled = filled.coerceIn(0, PROGRESS_BAR_WIDTH)
-    return "█".repeat(safeFilled) + "░".repeat(PROGRESS_BAR_WIDTH - safeFilled)
+    val filled = if (pulse <= barWidth) pulse else range - pulse
+    val safeFilled = filled.coerceIn(0, barWidth)
+    val fill = "█".repeat(safeFilled)
+    val rest = "░".repeat(barWidth - safeFilled)
+    return "[" + fill + rest + "]"
 }
 
 private fun shortenPath(path: String, maxLength: Int): String {
+    if (maxLength <= 0) return ""
     if (path.length <= maxLength) return path
     if (maxLength <= 3) return path.take(maxLength)
     return "..." + path.takeLast(maxLength - 3)
 }
 
-@Composable
-private fun DirectoryItem(node: FileNode, totalParentSize: Long, isSelected: Boolean) {
-    val size = node.totalSize()
-    val percentage = if (totalParentSize > 0) {
-        size.toDouble() / totalParentSize * 100
+private fun truncateWithEllipsis(text: String, maxLength: Int): String {
+    if (maxLength <= 0) return ""
+    if (text.length <= maxLength) return text.padEnd(maxLength)
+    return if (maxLength <= 3) {
+        text.take(maxLength)
     } else {
-        0.0
+        text.take(maxLength - 3) + "..."
     }
-
-    val sizeStr = SizeFormatter.format(size)
-    val percentStr = formatPercentage(percentage)
-
-    val barWidth = 20
-    val filledWidth = ((percentage / 100.0) * barWidth).toInt().coerceIn(0, barWidth)
-    val bar = "█".repeat(filledWidth) + " ".repeat(barWidth - filledWidth)
-
-    val sizeColor = when {
-        size >= 1_000_000_000 -> Color.Red
-        size >= 100_000_000 -> Color.Yellow
-        size >= 10_000_000 -> Color.Cyan
-        else -> Color.White
-    }
-
-    val displayName = if (node.name.length > 18) {
-        node.name.take(15) + "..."
-    } else {
-        node.name
-    }
-    val nameWithType = if (node.isDirectory) "$displayName/" else displayName
-
-    val selector = if (isSelected) ">" else " "
-    val nameColor = if (isSelected) Color.Green else if (node.isDirectory) Color.Blue else Color.White
-
-    Row {
-        Text("║  │ $selector")
-        Text(" ")
-        Text(nameWithType.padEnd(19), color = nameColor)
-        Text(" ")
-        Text(sizeStr.padEnd(8), color = sizeColor)
-        Text(" (")
-        Text("$percentStr%", color = sizeColor)
-        Text(") ")
-        Text(bar, color = if (isSelected) Color.Green else Color.Magenta)
-        Text(" │   ║")
-    }
-}
-
-@Composable
-private fun StatusBar(state: ExplorerState) {
-    Text("╠═════════════════════════════════════════════════════════════╣", color = Color.Cyan)
-
-    Row {
-        Text("║ ", color = Color.Cyan)
-        if (state.isLoading) {
-            val statusMsg = "[Scanning ${state.spinnerFrame}]"
-            val pathInfo = shortenPath(state.currentPath, 32)
-            Text(statusMsg, color = Color.Yellow)
-            Text("  Path: $pathInfo", color = Color.Cyan)
-        } else {
-            val statusMsg = when {
-                state.errorMessage != null -> "[${state.errorMessage.take(36)}]"
-                state.scanResult != null -> {
-                    val seconds = state.scanDurationMs / 1000.0
-                    val warningSuffix = if (state.warningCount > 0) " with ${state.warningCount} warning(s)" else ""
-                    "[Scan completed in ${formatDuration(seconds)}s$warningSuffix]"
-                }
-                else -> "[Idle]"
-            }
-            val statusColor = when {
-                state.errorMessage != null -> Color.Red
-                state.scanResult != null -> Color.Green
-                else -> Color.Cyan
-            }
-            val selected = state.selectedDirectory
-            val selectedSummary = selected?.let {
-                val size = SizeFormatter.format(it.totalSize())
-                "${it.name} ($size)"
-            } ?: "--"
-
-            Text(statusMsg, color = statusColor)
-            Text("  Sort: ${state.sortOrder.label}", color = Color.Cyan)
-            Text("  Selected: $selectedSummary", color = Color.Green)
-            if (state.warningCount > 0 && state.errorMessage == null) {
-                Text(" ⚠${state.warningCount}", color = Color.Yellow)
-            }
-        }
-        Text("  q: Quit", color = Color.Yellow)
-        Text(" ║", color = Color.Cyan)
-    }
-
-    Text("╚═════════════════════════════════════════════════════════════╝", color = Color.Cyan)
 }
 
 private fun formatPercentage(percentage: Double): String {
