@@ -18,9 +18,11 @@ import disksize.presentation.withNextSortOrder
 import disksize.presentation.tickSpinner
 import disksize.util.normalizePath
 import disksize.util.parentPath
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlin.system.exitProcess
 
 @Composable
@@ -41,7 +43,9 @@ fun DiskSizeApp(
 
     LaunchedEffect(currentPath, reloadTrigger) {
         state = state.withLoading(currentPath)
-        val result = scanDirectoryUseCase.execute(currentPath)
+        val result = withContext(Dispatchers.Default) {
+            scanDirectoryUseCase.execute(currentPath)
+        }
         state = result.fold(
             onSuccess = { scanResult ->
                 state.withScanResult(scanResult).resetSelection()
