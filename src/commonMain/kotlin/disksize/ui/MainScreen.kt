@@ -36,7 +36,7 @@ fun MainScreen(scanResult: ScanResult) {
 @Composable
 private fun HeaderBar() {
     Text("╔═════════════════════════════════════════════════════════════╗", color = Color.Cyan)
-    Text("║ DiskSize - Disk Space Analyzer                             ║", color = Color.Cyan)
+    Text("║ DiskSize - Disk Space Analyzer                              ║", color = Color.Cyan)
     Text("╠═════════════════════════════════════════════════════════════╣", color = Color.Cyan)
 }
 
@@ -63,22 +63,27 @@ private fun Statistics(scanResult: ScanResult) {
 @Composable
 private fun DirectoryList(children: List<FileNode>) {
     Text("║  Subdirectories:                                           ║")
-    Text("║  ┌────────────────────────────────────────────────────┐   ║")
+    Text("║  ┌────────────────────────────────────────────────────┐    ║")
 
-    if (children.isEmpty()) {
-        Text("║  │ (empty directory)                                  │   ║")
+    val directories = children.filter { it.isDirectory }
+
+    if (directories.isEmpty()) {
+        Text("║  │ (no subdirectories found)                          │   ║")
     } else {
         // Sort by size descending and take top entries
-        val sortedChildren = children.sortedByDescending { it.totalSize() }
-        val displayCount = minOf(sortedChildren.size, 10)
+        val sortedDirectories = directories.sortedByDescending { it.totalSize() }
+        val displayCount = minOf(sortedDirectories.size, 10)
+        val totalDirectorySize = sortedDirectories.sumOf { it.totalSize() }.coerceAtLeast(1L)
 
         for (i in 0 until displayCount) {
-            val child = sortedChildren[i]
-            DirectoryItem(child, children.sumOf { it.totalSize() })
+            val child = sortedDirectories[i]
+            DirectoryItem(child, totalDirectorySize)
         }
 
-        if (sortedChildren.size > displayCount) {
-            Text("║  │ ... and ${sortedChildren.size - displayCount} more${" ".repeat(35 - (sortedChildren.size - displayCount).toString().length)}│   ║")
+        if (sortedDirectories.size > displayCount) {
+            val remaining = sortedDirectories.size - displayCount
+            val padding = (35 - remaining.toString().length).coerceAtLeast(0)
+            Text("║  │ ... and $remaining more${" ".repeat(padding)}│   ║")
         }
     }
 
@@ -100,7 +105,7 @@ private fun DirectoryItem(node: FileNode, totalParentSize: Long) {
 
     // Create visual bar
     val barWidth = 20
-    val filledWidth = ((percentage / 100.0) * barWidth).toInt()
+    val filledWidth = ((percentage / 100.0) * barWidth).toInt().coerceIn(0, barWidth)
     val bar = "█".repeat(filledWidth) + " ".repeat(barWidth - filledWidth)
 
     // Get color based on size
@@ -140,7 +145,7 @@ private fun StatusBar(scanResult: ScanResult) {
     val durationSec = scanResult.scanDurationMs / 1000.0
     val durationStr = formatDuration(durationSec)
     val statusMsg = "[Scanning completed in ${durationStr}s]"
-    val padding = 39 - statusMsg.length
+    val padding = (39 - statusMsg.length).coerceAtLeast(0)
 
     Row {
         Text("║ ", color = Color.Cyan)

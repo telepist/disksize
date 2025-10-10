@@ -4,21 +4,23 @@ import com.jakewharton.mosaic.runMosaic
 import disksize.data.PosixFileSystemRepository
 import disksize.domain.usecase.ScanDirectoryUseCase
 import disksize.ui.MainScreen
+import kotlinx.cinterop.ByteVar
 import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.allocArray
+import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.toKString
 import kotlinx.coroutines.runBlocking
-import platform.posix.getenv
+import platform.posix.PATH_MAX
+import platform.posix.getcwd
 
 /**
- * Main entry point for DiskSize application.
+ * Shared entry point for POSIX native targets (macOS, Linux).
  */
 @OptIn(ExperimentalForeignApi::class)
 fun main(args: Array<String>) {
-    // Parse command-line arguments
     val targetPath = if (args.isNotEmpty()) {
         args[0]
     } else {
-        // Default to current directory
         getCurrentDirectory()
     }
 
@@ -26,11 +28,9 @@ fun main(args: Array<String>) {
     println()
 
     runBlocking {
-        // Set up dependencies
         val repository = PosixFileSystemRepository()
         val scanUseCase = ScanDirectoryUseCase(repository)
 
-        // Execute scan
         val result = scanUseCase.execute(targetPath)
 
         if (result.isFailure) {
@@ -40,18 +40,16 @@ fun main(args: Array<String>) {
 
         val scanResult = result.getOrNull()!!
 
-        // Display TUI
         runMosaic {
             MainScreen(scanResult)
         }
     }
 }
 
-/**
- * Get the current working directory.
- */
 @OptIn(ExperimentalForeignApi::class)
-private fun getCurrentDirectory(): String {
-    val pwd = getenv("PWD")?.toKString()
-    return pwd ?: "."
+private fun getCurrentDirectory(): String = memScoped {
+    val bufferSize = PATH_MAX + 1
+    val buffer = allocArray<ByteVar>(bufferSize)
+    val result = getcwd(buffer, bufferSize.toULong())
+    result?.toKString() ?: "."
 }

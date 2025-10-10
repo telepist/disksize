@@ -17,7 +17,7 @@ Build a TreeSize-inspired Terminal User Interface (TUI) application for scanning
 
 ## MVP Roadmap
 
-### MVP 1: Basic Directory Scanning & Display (Current)
+### MVP 1: Basic Directory Scanning & Display (Complete)
 **Goal**: Scan a directory and display basic size information in TUI
 
 **Features**:
@@ -110,12 +110,16 @@ disksize/
 ```
 
 ## Current Status
-- **Phase**: MVP 1 - Initial setup
+- **Phase**: Preparing MVP 2 - Interactive Navigation
+- **Recent Progress**:
+  - Completed directory scanning pipeline with POSIX implementation
+  - Delivered static Mosaic TUI for summarizing scan results
+  - Added unit test coverage for domain models, use cases, and utilities
 - **Next Steps**:
-  1. Set up testing infrastructure
-  2. Design core domain model
-  3. Implement file system scanning (TDD)
-  4. Create basic TUI display
+  1. Introduce interactive navigation controls (arrow keys, drill down/up)
+  2. Track selection state and render highlighted rows
+  3. Add sort options and status bar updates for navigation
+  4. Handle incremental re-scan requests when navigating
 
 ## Success Metrics
 - **Performance**: Scan 100GB in under 30 seconds
