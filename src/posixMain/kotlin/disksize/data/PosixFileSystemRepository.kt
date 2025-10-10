@@ -1,6 +1,8 @@
 package disksize.data
 
+import disksize.domain.model.ErrorType
 import disksize.domain.model.FileNode
+import disksize.domain.model.ScanError
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
@@ -22,10 +24,16 @@ import kotlin.Exception
 @OptIn(ExperimentalForeignApi::class)
 class PosixFileSystemRepository : FileSystemRepository {
 
-    override suspend fun scanDirectory(path: String): Result<FileNode> {
+    override suspend fun scanDirectory(path: String): Result<FileSystemRepository.DirectoryScanResult> {
         return try {
-            val node = scanDirectoryRecursive(path)
-            Result.success(node)
+            val errors = mutableListOf<ScanError>()
+            val node = scanDirectoryRecursive(path, errors)
+            Result.success(
+                FileSystemRepository.DirectoryScanResult(
+                    root = node,
+                    errors = errors
+                )
+            )
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -49,7 +57,10 @@ class PosixFileSystemRepository : FileSystemRepository {
         return access(path, platform.posix.R_OK) == 0
     }
 
-    private fun scanDirectoryRecursive(path: String): FileNode {
+    private fun scanDirectoryRecursive(
+        path: String,
+        errors: MutableList<ScanError>
+    ): FileNode {
         val node = createFileNode(path)
 
         if (!node.isDirectory) {
@@ -69,10 +80,14 @@ class PosixFileSystemRepository : FileSystemRepository {
                 val childPath = resolveChildPath(path, name)
 
                 try {
-                    val child = scanDirectoryRecursive(childPath)
+                    val child = scanDirectoryRecursive(childPath, errors)
                     children.add(child)
-                } catch (_: Exception) {
-                    // MVP1 silently skips inaccessible entries
+                } catch (e: Exception) {
+                    errors += ScanError(
+                        path = childPath,
+                        message = e.message ?: "Unable to access $childPath",
+                        type = classifyError(e)
+                    )
                     continue
                 }
             }
@@ -83,26 +98,7 @@ class PosixFileSystemRepository : FileSystemRepository {
         return node.copy(children = children)
     }
 
-    private fun createFileNode(path: String): FileNode = memScoped {
-        val statBuf = alloc<stat>()
-
-        if (stat(path, statBuf.ptr) != 0) {
-            throw Exception("Cannot stat file: $path")
-        }
-
-        val name = path.substringAfterLast('/')
-        val size = statBuf.st_size
-        val isDirectory = (statBuf.st_mode.toInt() and S_IFMT) == S_IFDIR
-
-        FileNode(
-            path = path,
-            name = name.ifEmpty { path },
-            size = size,
-            isDirectory = isDirectory,
-            children = emptyList(),
-            lastModified = 0L
-        )
-    }
+    private fun createFileNode(path: String): FileNode = platformCreateFileNode(path)
 }
 
 private fun resolveChildPath(parent: String, childName: String): String = when {
@@ -110,3 +106,15 @@ private fun resolveChildPath(parent: String, childName: String): String = when {
     parent.endsWith("/") -> parent + childName
     else -> "$parent/$childName"
 }
+
+private fun classifyError(exception: Exception): ErrorType {
+    val message = exception.message?.lowercase() ?: return ErrorType.UNKNOWN
+    return when {
+        "permission" in message && "denied" in message -> ErrorType.PERMISSION_DENIED
+        "not found" in message -> ErrorType.NOT_FOUND
+        "no such file" in message -> ErrorType.NOT_FOUND
+        else -> ErrorType.IO_ERROR
+    }
+}
+
+internal expect fun platformCreateFileNode(path: String): FileNode

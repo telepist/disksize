@@ -11,26 +11,26 @@
 ### Layout Structure (MVP 1)
 ```
 ╔═════════════════════════════════════════════════════════════╗
-║ DiskSize - Disk Space Analyzer                             ║
+║ DiskSize - Disk Space Analyzer                              ║
 ╠═════════════════════════════════════════════════════════════╣
-║ Path: /Users/username/Documents                            ║
+║ Path: /Users/username/Documents                             ║
 ╠═════════════════════════════════════════════════════════════╣
 ║                                                             ║
-║  Total Size: 15.2 GB                                       ║
-║  Files: 1,234                                              ║
-║  Directories: 156                                          ║
+║  Total Size: 15.2 GB                                        ║
+║  Files: 1,234                                               ║
+║  Directories: 156                                           ║
 ║                                                             ║
-║  Subdirectories:                                           ║
-║  ┌────────────────────────────────────────────────────┐   ║
-║  │ Projects/          8.5 GB  (55.9%) ████████████    │   ║
-║  │ Photos/            4.2 GB  (27.6%) ██████          │   ║
-║  │ Documents/         1.8 GB  (11.8%) ███             │   ║
-║  │ Downloads/         650 MB  ( 4.2%) █               │   ║
-║  │ Music/              70 MB  ( 0.5%)                 │   ║
-║  └────────────────────────────────────────────────────┘   ║
+║  Subdirectories:                                            ║
+║  ┌───────────────────────────────────────────────────────┐  ║
+║  │ Projects/          8.5 GB  (55.9%) ████████████       │  ║
+║  │ Photos/            4.2 GB  (27.6%) ██████             │  ║
+║  │ Documents/         1.8 GB  (11.8%) ███                │  ║
+║  │ Downloads/         650 MB  ( 4.2%) █                  │  ║
+║  │ Music/              70 MB  ( 0.5%)                    │  ║
+║  └───────────────────────────────────────────────────────┘  ║
 ║                                                             ║
 ╠═════════════════════════════════════════════════════════════╣
-║ [Scanning completed in 2.3s]                      q: Quit  ║
+║ [Scanning completed in 2.3s]                      q: Quit   ║
 ╚═════════════════════════════════════════════════════════════╝
 ```
 
@@ -39,7 +39,7 @@
 ╔═════════════════════════════════════════════════════════════╗
 ║ DiskSize v0.2.0                              [Sort: Size ▼] ║
 ╠═════════════════════════════════════════════════════════════╣
-║ /Users/username/Documents/Projects                         ║
+║ /Users/username/Documents/Projects                          ║
 ╠═════════════════════════════════════════════════════════════╣
 ║                                                             ║
 ║  📁 my-app/              3.2 GB  (37.6%) █████████      ◄  ║
@@ -52,7 +52,7 @@
 ║                                                             ║
 ║                                                             ║
 ╠═════════════════════════════════════════════════════════════╣
-║ Total: 8.5 GB | 2,345 files    ↑↓:Nav Enter:Open Bsp:Back ║
+║ Total: 8.5 GB | 2,345 files    ↑↓:Nav Enter:Open Bsp:Back   ║
 ╚═════════════════════════════════════════════════════════════╝
 ```
 
@@ -109,11 +109,8 @@ Always use 1024-based units (binary), show one decimal place for GB/TB.
 | Move Down | `↓` or `j` | Select next item |
 | Enter Directory | `Enter` or `→` or `l` | Navigate into selected directory |
 | Go Up One Level | `Backspace` or `←` or `h` | Navigate to parent directory |
-| Go to Top | `Home` or `g` | Jump to first item |
-| Go to Bottom | `End` or `G` | Jump to last item |
-| Sort Toggle | `s` | Cycle through sort options |
-| Refresh | `F5` or `r` | Re-scan current directory |
-| Quit | `q` or `Esc` | Exit application |
+| Sort Toggle | `s` | Cycle sort options (Size ↓ → Name ↑ → Date ↓) |
+| Quit | `q` | Exit application |
 
 ### MVP 3 - Advanced Features
 | Action | Key | Description |
@@ -135,14 +132,13 @@ Always use 1024-based units (binary), show one decimal place for GB/TB.
 
 ### Enhanced Flow (MVP 2)
 1. User launches application
-2. Directory scan starts, progress shown
-3. Results appear incrementally as directories are scanned
-4. User navigates with arrow keys
-5. User presses Enter to drill into a directory
-6. Subdirectory is scanned (if not already cached)
-7. Results displayed
-8. User can go back up or continue exploring
-9. User quits when done
+2. Application scans the requested directory and shows a loading banner
+3. Results render once the scan completes
+4. User navigates with arrow keys (or `j`/`k`)
+5. User presses Enter to drill into a directory (triggering a new scan)
+6. User presses Backspace to return to the parent directory
+7. Status bar highlights scan duration or any errors
+8. User quits with `q` when finished
 
 ## Error Handling
 
@@ -152,14 +148,14 @@ Always use 1024-based units (binary), show one decimal place for GB/TB.
 ║ ⚠ Warning                                                   ║
 ╠═════════════════════════════════════════════════════════════╣
 ║                                                             ║
-║  Could not access:                                         ║
-║    /System/Library/PrivateData/                            ║
+║  Could not access:                                          ║
+║    /System/Library/PrivateData/                             ║
 ║                                                             ║
-║  Reason: Permission denied                                 ║
+║  Reason: Permission denied                                  ║
 ║                                                             ║
-║  Continuing with remaining directories...                  ║
+║  Continuing with remaining directories...                   ║
 ║                                                             ║
-║                                                  [Press any key] ║
+║                                             [Press any key] ║
 ╚═════════════════════════════════════════════════════════════╝
 ```
 
@@ -212,22 +208,22 @@ Scanning: /Users/username/Documents/Projects
 ## Help System (MVP 3)
 ```
 ╔═════════════════════════════════════════════════════════════╗
-║ DiskSize - Help                                            ║
+║ DiskSize - Help                                             ║
 ╠═════════════════════════════════════════════════════════════╣
 ║                                                             ║
-║  Navigation:                                               ║
-║    ↑/↓ or j/k     Move selection up/down                  ║
-║    Enter or →/l   Open selected directory                 ║
-║    Backspace/←/h  Go to parent directory                  ║
-║    g/G            Jump to top/bottom                       ║
+║  Navigation:                                                ║
+║    ↑/↓ or j/k     Move selection up/down                    ║
+║    Enter or →/l   Open selected directory                   ║
+║    Backspace/←/h  Go to parent directory                    ║
+║    g/G            Jump to top/bottom                        ║
 ║                                                             ║
-║  Actions:                                                  ║
-║    s              Change sort order                        ║
-║    r              Refresh current directory                ║
-║    q/Esc          Quit application                         ║
-║    ?              Show this help                           ║
+║  Actions:                                                   ║
+║    s              Change sort order                         ║
+║    r              Refresh current directory                 ║
+║    q/Esc          Quit application                          ║
+║    ?              Show this help                            ║
 ║                                                             ║
-║                                              [Press any key] ║
+║                                             [Press any key] ║
 ╚═════════════════════════════════════════════════════════════╝
 ```
 

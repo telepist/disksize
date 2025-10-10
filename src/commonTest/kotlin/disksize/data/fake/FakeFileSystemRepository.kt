@@ -2,6 +2,8 @@ package disksize.data.fake
 
 import disksize.data.FileSystemRepository
 import disksize.domain.model.FileNode
+import disksize.domain.model.ScanError
+import disksize.domain.model.ErrorType
 
 /**
  * Fake implementation of FileSystemRepository for testing.
@@ -33,7 +35,7 @@ class FakeFileSystemRepository : FileSystemRepository {
         inaccessiblePaths.clear()
     }
 
-    override suspend fun scanDirectory(path: String): Result<FileNode> {
+    override suspend fun scanDirectory(path: String): Result<FileSystemRepository.DirectoryScanResult> {
         if (path in inaccessiblePaths) {
             return Result.failure(Exception("Permission denied: $path"))
         }
@@ -45,7 +47,25 @@ class FakeFileSystemRepository : FileSystemRepository {
             return Result.failure(Exception("Not a directory: $path"))
         }
 
-        return Result.success(node)
+        val errors = mutableListOf<ScanError>()
+        val sanitizedChildren = node.children.filter { child ->
+            val denied = child.path in inaccessiblePaths
+            if (denied) {
+                errors += ScanError(
+                    path = child.path,
+                    message = "Permission denied",
+                    type = ErrorType.PERMISSION_DENIED
+                )
+            }
+            !denied
+        }
+
+        return Result.success(
+            FileSystemRepository.DirectoryScanResult(
+                root = node.copy(children = sanitizedChildren),
+                errors = errors
+            )
+        )
     }
 
     override suspend fun getFileInfo(path: String): Result<FileNode> {

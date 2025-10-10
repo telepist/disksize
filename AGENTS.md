@@ -19,6 +19,7 @@
 - There is no automated formatter yet—use the IDE’s Kotlin reformatter before committing to keep diffs clean.
 
 ## Testing Guidelines
+- Write tests first (TDD) for new features and bug fixes; add tests when fixing bugs in untested code.
 - Use JUnit 5 with MockK/Truth from `commonTest`; every new feature should ship with unit coverage or higher-level tests.
 - Execute `./gradlew test` before pushing; CI enforces the same command.
 - For coverage verification, run `./gradlew test koverHtmlReport` and review `build/reports/kover/html/index.html`—keep overall coverage ≥80% and domain modules ≥90%.

@@ -3,7 +3,7 @@ package disksize
 import com.jakewharton.mosaic.runMosaic
 import disksize.data.PosixFileSystemRepository
 import disksize.domain.usecase.ScanDirectoryUseCase
-import disksize.ui.MainScreen
+import disksize.ui.DiskSizeApp
 import kotlinx.cinterop.ByteVar
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.allocArray
@@ -24,24 +24,15 @@ fun main(args: Array<String>) {
         getCurrentDirectory()
     }
 
-    println("DiskSize - Scanning directory: $targetPath")
-    println()
-
     runBlocking {
         val repository = PosixFileSystemRepository()
         val scanUseCase = ScanDirectoryUseCase(repository)
 
-        val result = scanUseCase.execute(targetPath)
-
-        if (result.isFailure) {
-            println("Error: ${result.exceptionOrNull()?.message}")
-            return@runBlocking
-        }
-
-        val scanResult = result.getOrNull()!!
-
         runMosaic {
-            MainScreen(scanResult)
+            DiskSizeApp(
+                initialPath = targetPath,
+                scanDirectoryUseCase = scanUseCase
+            )
         }
     }
 }

@@ -1,19 +1,25 @@
 package disksize.data
 
 import disksize.domain.model.FileNode
+import disksize.domain.model.ScanError
 
 /**
  * Repository interface for file system operations.
  * Platform-specific implementations will provide actual file system access.
  */
 interface FileSystemRepository {
+    data class DirectoryScanResult(
+        val root: FileNode,
+        val errors: List<ScanError>
+    )
+
     /**
      * Scan a directory and return its structure with all children.
      *
      * @param path Absolute path to the directory to scan
-     * @return Result containing the FileNode tree, or an error if the operation fails
+     * @return Result containing the FileNode tree and any non-fatal errors, or a failure if the operation fails
      */
-    suspend fun scanDirectory(path: String): Result<FileNode>
+    suspend fun scanDirectory(path: String): Result<DirectoryScanResult>
 
     /**
      * Get basic information about a single file or directory without scanning children.

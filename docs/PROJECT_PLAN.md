@@ -40,11 +40,11 @@ Build a TreeSize-inspired Terminal User Interface (TUI) application for scanning
 **Goal**: Navigate through directory hierarchy interactively
 
 **Features**:
-- Keyboard navigation (arrow keys, Enter to drill down, Backspace to go up)
-- Highlight selected directory
-- Sort options (by size, name, date)
-- Status bar with current path and total size
-- Color-coded size indicators
+- [x] Keyboard navigation (arrow keys, Enter to drill down, Backspace to go up)
+- [x] Highlight selected directory with contextual status bar hints
+- [x] Sort options (by size, name, date)
+- [x] Enhanced status bar showing aggregated totals for selection
+- [x] Color-coded size indicators
 
 ### MVP 3: Tree Visualization & Percentages
 **Goal**: Visual representation of space usage

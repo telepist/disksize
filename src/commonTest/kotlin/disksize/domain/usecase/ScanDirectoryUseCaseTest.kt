@@ -6,6 +6,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class ScanDirectoryUseCaseTest {
@@ -94,6 +95,29 @@ class ScanDirectoryUseCaseTest {
         val scanResult = result.getOrNull()!!
         assertTrue(scanResult.errors.isEmpty())
         assertTrue(scanResult.isSuccessful())
+    }
+
+    @Test
+    fun `should surface repository warnings`() = runTest {
+        val child = FileNode("/test/secret", "secret", 0, true, emptyList(), 0L)
+        val testNode = FileNode(
+            path = "/test",
+            name = "test",
+            size = 0,
+            isDirectory = true,
+            children = listOf(child),
+            lastModified = 0L
+        )
+        repository.addFile(child)
+        repository.addFile(testNode)
+        repository.markInaccessible(child.path)
+
+        val result = useCase.execute("/test")
+
+        assertTrue(result.isSuccess)
+        val scanResult = result.getOrNull()!!
+        assertEquals(1, scanResult.errors.size)
+        assertFalse(scanResult.isSuccessful())
     }
 
     @Test

@@ -64,21 +64,21 @@ kotlin {
             }
         }
 
-        val macosArm64Main by getting
-        val macosX64Main by getting
-        val linuxX64Main by getting
-        val linuxArm64Main by getting
+        val posixMain by creating {
+            dependsOn(commonMain)
+        }
+        val posixTest by creating {
+            dependsOn(commonTest)
+        }
 
-        val macosArm64Test by getting
-        val macosX64Test by getting
-        val linuxX64Test by getting
-        val linuxArm64Test by getting
+        val macosArm64Main by getting { dependsOn(posixMain) }
+        val macosX64Main by getting { dependsOn(posixMain) }
+        val linuxX64Main by getting { dependsOn(posixMain) }
+        val linuxArm64Main by getting { dependsOn(posixMain) }
+
+        val macosArm64Test by getting { dependsOn(posixTest) }
+        val macosX64Test by getting { dependsOn(posixTest) }
+        val linuxX64Test by getting { dependsOn(posixTest) }
+        val linuxArm64Test by getting { dependsOn(posixTest) }
     }
 }
-
-// Share POSIX-specific native code between macOS and Linux targets without duplicating files.
-val posixSharedDir = "${project.projectDir}/src/posixMain/kotlin"
-kotlin.sourceSets.named("macosArm64Main") { kotlin.srcDir(posixSharedDir) }
-kotlin.sourceSets.named("macosX64Main") { kotlin.srcDir(posixSharedDir) }
-kotlin.sourceSets.named("linuxX64Main") { kotlin.srcDir(posixSharedDir) }
-kotlin.sourceSets.named("linuxArm64Main") { kotlin.srcDir(posixSharedDir) }

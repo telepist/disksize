@@ -76,15 +76,15 @@ Options:
 ### Screen Layout
 ```
 ╔═════════════════════════════════════════════════════════════╗
-║ [1] Header       - Application title and current settings  ║
+║ [1] Header       - Application title and current settings   ║
 ╠═════════════════════════════════════════════════════════════╣
-║ [2] Path Bar     - Current directory path                  ║
+║ [2] Path Bar     - Current directory path                   ║
 ╠═════════════════════════════════════════════════════════════╣
-║ [3] Content Area - List of directories and files           ║
-║                    with sizes and percentages              ║
+║ [3] Content Area - List of directories and files            ║
+║                    with sizes and percentages               ║
 ║                                                             ║
 ╠═════════════════════════════════════════════════════════════╣
-║ [4] Status Bar   - Statistics, help hints, messages        ║
+║ [4] Status Bar   - Statistics, help hints, messages         ║
 ╚═════════════════════════════════════════════════════════════╝
 ```
 
@@ -99,32 +99,24 @@ DiskSize uses colors to help you quickly identify large items:
 
 ## Keyboard Controls
 
-### Navigation (MVP 1)
-| Key | Action |
-|-----|--------|
-| `q` | Quit application |
-
-### Interactive Navigation (MVP 2)
-| Key | Action |
-|-----|--------|
-| `↑` or `k` | Move selection up |
-| `↓` or `j` | Move selection down |
-| `Enter` or `→` or `l` | Enter selected directory |
-| `Backspace` or `←` or `h` | Go up to parent directory |
-| `Home` or `g` | Jump to first item |
-| `End` or `G` | Jump to last item |
-| `s` | Change sort order |
-| `r` or `F5` | Refresh/re-scan current directory |
-| `q` or `Esc` | Quit application |
+### Interactive Navigation
+| Key                       | Action                                      |
+|---------------------------|---------------------------------------------|
+| `↑` or `k`                | Move selection up                           |
+| `↓` or `j`                | Move selection down                         |
+| `Enter` or `→` or `l`     | Open the selected directory                 |
+| `Backspace` or `←` or `h` | Navigate to the parent directory            |
+| `s`                       | Cycle sort order (Size ↓ → Name ↑ → Date ↓) |
+| `q`                       | Quit the application                        |
 
 ### Advanced Controls (MVP 3)
-| Key | Action |
-|-----|--------|
-| `/` | Search for files/directories |
-| `f` | Filter by file type |
-| `v` | Change view mode (tree/list/details) |
-| `.` | Toggle hidden files visibility |
-| `?` or `F1` | Show help screen |
+| Key         | Action                               |
+|-------------|--------------------------------------|
+| `/`         | Search for files/directories         |
+| `f`         | Filter by file type                  |
+| `v`         | Change view mode (tree/list/details) |
+| `.`         | Toggle hidden files visibility       |
+| `?` or `F1` | Show help screen                     |
 
 ## Understanding the Display
 

@@ -1,35 +1,85 @@
 package disksize.ui
 
 import androidx.compose.runtime.Composable
+import com.jakewharton.mosaic.layout.KeyEvent
+import com.jakewharton.mosaic.layout.onKeyEvent
+import com.jakewharton.mosaic.modifier.Modifier
 import com.jakewharton.mosaic.ui.Color
 import com.jakewharton.mosaic.ui.Column
 import com.jakewharton.mosaic.ui.Row
 import com.jakewharton.mosaic.ui.Text
 import disksize.domain.model.FileNode
-import disksize.domain.model.ScanResult
+import disksize.presentation.ExplorerState
+import disksize.presentation.SortOrder
 import disksize.util.SizeFormatter
 
 /**
- * Main screen composable for DiskSize TUI.
- * Displays scan results with directory information.
+ * Main screen composable for DiskSize TUI with interactive navigation.
  */
 @Composable
-fun MainScreen(scanResult: ScanResult) {
-    Column {
-        // Header
+fun MainScreen(
+    state: ExplorerState,
+    onMoveSelection: (Int) -> Unit,
+    onOpenSelected: () -> Unit,
+    onNavigateUp: () -> Unit,
+    onCycleSort: () -> Unit,
+    onQuit: () -> Unit
+) {
+    Column(
+        modifier = Modifier.onKeyEvent { event ->
+            handleKey(
+                event = event,
+                moveSelection = onMoveSelection,
+                openSelected = onOpenSelected,
+                navigateUp = onNavigateUp,
+                cycleSort = onCycleSort,
+                quit = onQuit
+            )
+        }
+    ) {
         HeaderBar()
+        PathBar(state.currentPath)
+        Statistics(state)
+        DirectoryList(
+            directories = state.directories,
+            selectedIndex = state.selectedIndex,
+            isLoading = state.isLoading,
+            errorMessage = state.errorMessage,
+            sortOrder = state.sortOrder,
+            warningCount = state.warningCount
+        )
+        StatusBar(state)
+    }
+}
 
-        // Path
-        PathBar(scanResult.rootPath)
-
-        // Statistics
-        Statistics(scanResult)
-
-        // Directory list
-        DirectoryList(scanResult.rootNode.children)
-
-        // Status bar
-        StatusBar(scanResult)
+private fun handleKey(
+    event: KeyEvent,
+    moveSelection: (Int) -> Unit,
+    openSelected: () -> Unit,
+    navigateUp: () -> Unit,
+    cycleSort: () -> Unit,
+    quit: () -> Unit
+): Boolean {
+    return when (event.key) {
+        "ArrowDown", "j" -> {
+            moveSelection(1); true
+        }
+        "ArrowUp", "k" -> {
+            moveSelection(-1); true
+        }
+        "Enter", "ArrowRight", "l" -> {
+            openSelected(); true
+        }
+        "Backspace", "ArrowLeft", "h" -> {
+            navigateUp(); true
+        }
+        "s", "S" -> {
+            cycleSort(); true
+        }
+        "q", "Q" -> {
+            quit(); true
+        }
+        else -> false
     }
 }
 
@@ -52,50 +102,107 @@ private fun PathBar(path: String) {
 }
 
 @Composable
-private fun Statistics(scanResult: ScanResult) {
+private fun Statistics(state: ExplorerState) {
+    val totalSize = if (state.scanResult != null) {
+        SizeFormatter.format(state.totalSize).padEnd(48)
+    } else {
+        "--".padEnd(48)
+    }
+    val files = if (state.scanResult != null) {
+        state.fileCount.toString().padEnd(53)
+    } else {
+        "--".padEnd(53)
+    }
+    val directories = if (state.scanResult != null) {
+        state.directoryCount.toString().padEnd(48)
+    } else {
+        "--".padEnd(48)
+    }
+
     Text("║                                                             ║")
-    Text("║  Total Size: ${SizeFormatter.format(scanResult.totalSize).padEnd(48)}║")
-    Text("║  Files: ${scanResult.fileCount.toString().padEnd(53)}║")
-    Text("║  Directories: ${scanResult.directoryCount.toString().padEnd(48)}║")
+    Text("║  Total Size: $totalSize║")
+    Text("║  Files: $files║")
+    Text("║  Directories: $directories║")
     Text("║                                                             ║")
 }
 
 @Composable
-private fun DirectoryList(children: List<FileNode>) {
-    Text("║  Subdirectories:                                           ║")
+private fun DirectoryList(
+    directories: List<FileNode>,
+    selectedIndex: Int,
+    isLoading: Boolean,
+    errorMessage: String?,
+    sortOrder: SortOrder,
+    warningCount: Int
+) {
+    val headerTitle = "Subdirectories (Sort: ${sortOrder.label})"
+    Text(sectionHeader(headerTitle))
     Text("║  ┌────────────────────────────────────────────────────┐    ║")
 
-    val directories = children.filter { it.isDirectory }
-
-    if (directories.isEmpty()) {
-        Text("║  │ (no subdirectories found)                          │   ║")
-    } else {
-        // Sort by size descending and take top entries
-        val sortedDirectories = directories.sortedByDescending { it.totalSize() }
-        val displayCount = minOf(sortedDirectories.size, 10)
-        val totalDirectorySize = sortedDirectories.sumOf { it.totalSize() }.coerceAtLeast(1L)
-
-        for (i in 0 until displayCount) {
-            val child = sortedDirectories[i]
-            DirectoryItem(child, totalDirectorySize)
+    when {
+        isLoading -> Text(contentLine("Scanning..."))
+        errorMessage != null -> {
+            val message = "ERROR: ${errorMessage.take(46)}"
+            Text(contentLine(message))
         }
-
-        if (sortedDirectories.size > displayCount) {
-            val remaining = sortedDirectories.size - displayCount
-            val padding = (35 - remaining.toString().length).coerceAtLeast(0)
-            Text("║  │ ... and $remaining more${" ".repeat(padding)}│   ║")
+        directories.isEmpty() -> {
+            Text(contentLine("(no subdirectories found)"))
         }
+        else -> {
+            val maxVisible = 10
+            val totalCount = directories.size
+            val windowStart = when {
+                totalCount <= maxVisible -> 0
+                selectedIndex < maxVisible -> 0
+                selectedIndex >= totalCount - maxVisible -> (totalCount - maxVisible).coerceAtLeast(0)
+                else -> selectedIndex - maxVisible / 2
+            }
+            val windowEnd = (windowStart + maxVisible).coerceAtMost(totalCount)
+            val visible = directories.subList(windowStart, windowEnd)
+            val totalSize = directories.sumOf { it.totalSize() }.coerceAtLeast(1L)
+
+            if (windowStart > 0) {
+                Text(contentLine("... (more above)"))
+            }
+
+            visible.forEachIndexed { index, node ->
+                val absoluteIndex = windowStart + index
+                val isSelected = absoluteIndex == selectedIndex
+                DirectoryItem(node, totalSize, isSelected)
+            }
+
+            if (windowEnd < totalCount) {
+                Text(contentLine("... (more below)"))
+            }
+        }
+    }
+
+    if (warningCount > 0) {
+        val warningText = "Warnings: $warningCount item(s) skipped"
+        Text(contentLine(warningText))
     }
 
     Text("║  └────────────────────────────────────────────────────┘   ║")
     Text("║                                                             ║")
 }
 
+private fun sectionHeader(title: String): String {
+    val innerWidth = 55
+    val padded = title.padEnd(innerWidth)
+    return "║  ${padded.take(innerWidth)} ║"
+}
+
+private fun contentLine(text: String): String {
+    val innerWidth = 54
+    val padded = text.padEnd(innerWidth)
+    return "║  │ ${padded.take(innerWidth)}│   ║"
+}
+
 @Composable
-private fun DirectoryItem(node: FileNode, totalParentSize: Long) {
+private fun DirectoryItem(node: FileNode, totalParentSize: Long, isSelected: Boolean) {
     val size = node.totalSize()
     val percentage = if (totalParentSize > 0) {
-        (size.toDouble() / totalParentSize * 100)
+        size.toDouble() / totalParentSize * 100
     } else {
         0.0
     }
@@ -103,20 +210,17 @@ private fun DirectoryItem(node: FileNode, totalParentSize: Long) {
     val sizeStr = SizeFormatter.format(size)
     val percentStr = formatPercentage(percentage)
 
-    // Create visual bar
     val barWidth = 20
     val filledWidth = ((percentage / 100.0) * barWidth).toInt().coerceIn(0, barWidth)
     val bar = "█".repeat(filledWidth) + " ".repeat(barWidth - filledWidth)
 
-    // Get color based on size
     val sizeColor = when {
-        size >= 1_000_000_000 -> Color.Red      // >= 1 GB
-        size >= 100_000_000 -> Color.Yellow     // >= 100 MB
-        size >= 10_000_000 -> Color.Cyan        // >= 10 MB
+        size >= 1_000_000_000 -> Color.Red
+        size >= 100_000_000 -> Color.Yellow
+        size >= 10_000_000 -> Color.Cyan
         else -> Color.White
     }
 
-    // Truncate name if too long
     val displayName = if (node.name.length > 18) {
         node.name.take(15) + "..."
     } else {
@@ -124,43 +228,72 @@ private fun DirectoryItem(node: FileNode, totalParentSize: Long) {
     }
     val nameWithType = if (node.isDirectory) "$displayName/" else displayName
 
-    // Format line
+    val selector = if (isSelected) ">" else " "
+    val nameColor = if (isSelected) Color.Green else if (node.isDirectory) Color.Blue else Color.White
+
     Row {
-        Text("║  │ ")
-        Text(nameWithType.padEnd(20), color = if (node.isDirectory) Color.Blue else Color.White)
+        Text("║  │ $selector")
+        Text(" ")
+        Text(nameWithType.padEnd(19), color = nameColor)
         Text(" ")
         Text(sizeStr.padEnd(8), color = sizeColor)
         Text(" (")
         Text("$percentStr%", color = sizeColor)
         Text(") ")
-        Text(bar, color = Color.Magenta)
+        Text(bar, color = if (isSelected) Color.Green else Color.Magenta)
         Text(" │   ║")
     }
 }
 
 @Composable
-private fun StatusBar(scanResult: ScanResult) {
+private fun StatusBar(state: ExplorerState) {
     Text("╠═════════════════════════════════════════════════════════════╣", color = Color.Cyan)
 
-    val durationSec = scanResult.scanDurationMs / 1000.0
-    val durationStr = formatDuration(durationSec)
-    val statusMsg = "[Scanning completed in ${durationStr}s]"
-    val padding = (39 - statusMsg.length).coerceAtLeast(0)
+    val statusMsg = when {
+        state.isLoading -> "[Scanning...]"
+        state.errorMessage != null -> "[${state.errorMessage.take(36)}]"
+        state.scanResult != null -> {
+            val seconds = state.scanDurationMs / 1000.0
+            val warningSuffix = if (state.warningCount > 0) " with ${state.warningCount} warning(s)" else ""
+            "[Scan completed in ${formatDuration(seconds)}s$warningSuffix]"
+        }
+        else -> "[Idle]"
+    }
+
+    val selected = state.selectedDirectory
+    val selectedSummary = selected?.let {
+        val size = SizeFormatter.format(it.totalSize())
+        "${it.name} ($size)"
+    } ?: "--"
+    val sortSummary = state.sortOrder.label
+    val warningsInfo = if (state.warningCount > 0 && state.errorMessage == null) {
+        " ⚠${state.warningCount}"
+    } else {
+        ""
+    }
 
     Row {
         Text("║ ", color = Color.Cyan)
-        Text(statusMsg, color = Color.Green)
-        Text(" ".repeat(padding))
-        Text("q: Quit", color = Color.Yellow)
-        Text("  ║", color = Color.Cyan)
+        val statusColor = when {
+            state.errorMessage != null -> Color.Red
+            state.isLoading -> Color.Yellow
+            else -> Color.Green
+        }
+        Text(statusMsg, color = statusColor)
+        Text("  ", color = Color.Cyan)
+        Text("Sort: $sortSummary", color = Color.Cyan)
+        Text("  ", color = Color.Cyan)
+        Text("Selected: $selectedSummary", color = Color.Green)
+        if (warningsInfo.isNotEmpty()) {
+            Text(warningsInfo, color = Color.Yellow)
+        }
+        Text("  q: Quit", color = Color.Yellow)
+        Text(" ║", color = Color.Cyan)
     }
 
     Text("╚═════════════════════════════════════════════════════════════╝", color = Color.Cyan)
 }
 
-/**
- * Format a percentage value to one decimal place without using String.format().
- */
 private fun formatPercentage(percentage: Double): String {
     val rounded = kotlin.math.round(percentage * 10) / 10.0
     val integerPart = rounded.toInt()
@@ -169,9 +302,6 @@ private fun formatPercentage(percentage: Double): String {
     return "$integerPart.$decimalDigit"
 }
 
-/**
- * Format a duration value to one decimal place without using String.format().
- */
 private fun formatDuration(seconds: Double): String {
     val rounded = kotlin.math.round(seconds * 10) / 10.0
     val integerPart = rounded.toInt()

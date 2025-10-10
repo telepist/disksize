@@ -25,7 +25,9 @@ class FakeFileSystemRepositoryTest {
         val result = repo.scanDirectory("/test")
 
         assertTrue(result.isSuccess)
-        assertEquals(testNode, result.getOrNull())
+        val scanResult = result.getOrNull()!!
+        assertEquals(testNode, scanResult.root)
+        assertTrue(scanResult.errors.isEmpty())
     }
 
     @Test
@@ -134,5 +136,30 @@ class FakeFileSystemRepositoryTest {
         // After clear, paths should no longer be marked as inaccessible
         repo.addFile(FileNode("/test1", "test1", 0, true, emptyList(), 0L))
         assertTrue(repo.isAccessible("/test1"))
+    }
+
+    @Test
+    fun `should include errors for inaccessible children`() = runTest {
+        val repo = FakeFileSystemRepository()
+        val child = FileNode("/test/secret", "secret", 0, true, emptyList(), 0L)
+        val parent = FileNode(
+            path = "/test",
+            name = "test",
+            size = 0,
+            isDirectory = true,
+            children = listOf(child),
+            lastModified = 0L
+        )
+        repo.addFile(child)
+        repo.addFile(parent)
+        repo.markInaccessible(child.path)
+
+        val result = repo.scanDirectory("/test")
+
+        assertTrue(result.isSuccess)
+        val scanResult = result.getOrNull()!!
+        assertTrue(scanResult.root.children.isEmpty())
+        assertEquals(1, scanResult.errors.size)
+        assertEquals(child.path, scanResult.errors.first().path)
     }
 }

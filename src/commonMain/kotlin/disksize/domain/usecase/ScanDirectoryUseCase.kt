@@ -1,8 +1,6 @@
 package disksize.domain.usecase
 
 import disksize.data.FileSystemRepository
-import disksize.domain.model.ErrorType
-import disksize.domain.model.ScanError
 import disksize.domain.model.ScanResult
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -25,10 +23,8 @@ class ScanDirectoryUseCase(
      */
     suspend fun execute(path: String): Result<ScanResult> {
         val startTime = TimeSource.Monotonic.markNow()
-        val errors = mutableListOf<ScanError>()
 
         return try {
-            // Scan the directory
             val scanResult = repository.scanDirectory(path)
 
             if (scanResult.isFailure) {
@@ -37,17 +33,14 @@ class ScanDirectoryUseCase(
                 )
             }
 
-            val rootNode = scanResult.getOrNull()!!
+            val (rootNode, repoErrors) = scanResult.getOrNull()!!
 
-            // Calculate statistics
             val totalSize = rootNode.totalSize()
             val fileCount = rootNode.fileCount()
             val directoryCount = rootNode.directoryCount()
 
-            // Check for cancellation
             currentCoroutineContext().ensureActive()
 
-            // Calculate scan duration
             val duration = startTime.elapsedNow().inWholeMilliseconds
 
             Result.success(
@@ -58,7 +51,7 @@ class ScanDirectoryUseCase(
                     directoryCount = directoryCount,
                     rootNode = rootNode,
                     scanDurationMs = duration,
-                    errors = errors
+                    errors = repoErrors
                 )
             )
         } catch (e: Exception) {
