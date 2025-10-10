@@ -1,47 +1,48 @@
 plugins {
-    kotlin("multiplatform") version "2.2.20"
-    id("org.jetbrains.compose") version "1.8.0"
-    id("org.jetbrains.kotlin.plugin.compose") version "2.2.20"
+    alias(libs.plugins.kotlin.multiplatform)
+    alias(libs.plugins.jetbrains.compose)
+    alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kover)
 }
 
 kotlin {
     macosArm64 {
         binaries {
             executable {
-                baseName = "kotlinHello"
-                entryPoint = "helloworld.main"
+                baseName = "disksize"
+                entryPoint = "disksize.main"
             }
         }
     }
     macosX64 {
         binaries {
             executable {
-                baseName = "kotlinHello"
-                entryPoint = "helloworld.main"
+                baseName = "disksize"
+                entryPoint = "disksize.main"
             }
         }
     }
     linuxX64 {
         binaries {
             executable {
-                baseName = "kotlinHello"
-                entryPoint = "helloworld.main"
+                baseName = "disksize"
+                entryPoint = "disksize.main"
             }
         }
     }
     linuxArm64 {
         binaries {
             executable {
-                baseName = "kotlinHello"
-                entryPoint = "helloworld.main"
+                baseName = "disksize"
+                entryPoint = "disksize.main"
             }
         }
     }
     mingwX64 {
         binaries {
             executable {
-                baseName = "kotlinHello"
-                entryPoint = "helloworld.main"
+                baseName = "disksize"
+                entryPoint = "disksize.main"
             }
         }
     }
@@ -53,33 +54,47 @@ kotlin {
     sourceSets {
         commonMain {
             dependencies {
-                implementation("com.jakewharton.mosaic:mosaic-runtime:0.18.0")
+                implementation(libs.mosaic.runtime)
+            }
+        }
+        commonTest {
+            dependencies {
+                implementation(libs.kotlin.test)
+                implementation(libs.kotlinx.coroutines.test)
+                implementation(libs.mockk)
+                implementation(libs.truth)
             }
         }
     }
 }
 
-// Convenience alias tasks for executables.
+// Build-only tasks for TUI app
+// Note: Mosaic requires a real TTY, which Gradle cannot provide.
+// Use the Makefile or run the executable directly in your terminal.
 
-// macOS
-tasks.register("runDebugMacosArm64") {
-    dependsOn("runDebugExecutableMacosArm64")
+tasks.register("buildTui") {
+    group = "application"
+    description = "Build the TUI app (debug mode) for macOS ARM64"
+    dependsOn("linkDebugExecutableMacosArm64")
 }
 
-tasks.register("runDebugMacosX64") {
-    dependsOn("runDebugExecutableMacosX64")
+tasks.register("buildTuiRelease") {
+    group = "application"
+    description = "Build the TUI app (release mode) for macOS ARM64"
+    dependsOn("linkReleaseExecutableMacosArm64")
 }
 
-// Linux
-tasks.register("runDebugLinuxX64") {
-    dependsOn("runDebugExecutableLinuxX64")
-}
+// Helper task to show the executable path for manual running
+tasks.register("showExePath") {
+    group = "application"
+    description = "Show the path to the built executable"
 
-tasks.register("runDebugLinuxArm64") {
-    dependsOn("runDebugExecutableLinuxArm64")
-}
-
-// Windows
-tasks.register("runDebugWindows") {
-    dependsOn("runDebugExecutableMingwX64")
+    doLast {
+        println("\nExecutable locations:")
+        println("  Debug:   ${project.layout.buildDirectory.get()}/bin/macosArm64/debugExecutable/disksize.kexe")
+        println("  Release: ${project.layout.buildDirectory.get()}/bin/macosArm64/releaseExecutable/disksize.kexe")
+        println("\nTo run manually:")
+        println("  ./build/bin/macosArm64/debugExecutable/disksize.kexe")
+        println("  ./build/bin/macosArm64/releaseExecutable/disksize.kexe")
+    }
 }
