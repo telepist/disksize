@@ -2,6 +2,8 @@ package disksize.data
 
 import disksize.domain.model.FileNode
 import disksize.domain.model.ScanError
+import disksize.domain.model.ScanProgress
+import kotlinx.coroutines.flow.Flow
 
 /**
  * Repository interface for file system operations.
@@ -19,7 +21,7 @@ interface FileSystemRepository {
      * @param path Absolute path to the directory to scan
      * @return Result containing the FileNode tree and any non-fatal errors, or a failure if the operation fails
      */
-    suspend fun scanDirectory(path: String): Result<DirectoryScanResult>
+    fun scanDirectory(path: String): Flow<DirectoryScanUpdate>
 
     /**
      * Get basic information about a single file or directory without scanning children.
@@ -44,4 +46,9 @@ interface FileSystemRepository {
      * @return true if the path can be accessed, false otherwise
      */
     suspend fun isAccessible(path: String): Boolean
+}
+
+sealed interface DirectoryScanUpdate {
+    data class Progress(val progress: ScanProgress) : DirectoryScanUpdate
+    data class Complete(val result: FileSystemRepository.DirectoryScanResult) : DirectoryScanUpdate
 }

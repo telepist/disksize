@@ -82,8 +82,10 @@ data class ScanError(
 #### Use Cases
 ```kotlin
 interface ScanDirectoryUseCase {
-    suspend fun execute(path: String): Result<ScanResult>
+    fun scan(path: String): Flow<ScanStatus>
 }
+
+The flow emits `ScanStatus.Progress` events with `ScanProgress` payloads as the traversal advances, followed by a terminal `ScanStatus.Completed` containing the `ScanResult`.
 
 interface GetDirectoryChildrenUseCase {
     suspend fun execute(node: FileNode): Result<List<FileNode>>
@@ -99,8 +101,8 @@ interface CalculateSizesUseCase {
 #### Repository
 ```kotlin
 interface FileSystemRepository {
-    suspend fun scanDirectory(path: String): Result<FileNode>
-    suspend fun getFileInfo(path: String): Result<FileInfo>
+    fun scanDirectory(path: String): Flow<DirectoryScanUpdate>
+    suspend fun getFileInfo(path: String): Result<FileNode>
     suspend fun exists(path: String): Boolean
     suspend fun isAccessible(path: String): Boolean
 }

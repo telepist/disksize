@@ -2,12 +2,16 @@ package disksize.domain.usecase
 
 import disksize.data.fake.FakeFileSystemRepository
 import disksize.domain.model.FileNode
+import disksize.domain.model.ScanProgress
+import disksize.domain.model.ScanStatus
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.test.assertFailsWith
 
 class ScanDirectoryUseCaseTest {
     private lateinit var repository: FakeFileSystemRepository
@@ -35,11 +39,9 @@ class ScanDirectoryUseCaseTest {
         repository.addFile(testNode)
 
         // When
-        val result = useCase.execute("/test")
+        val updates = useCase.scan("/test").toList()
 
-        // Then
-        assertTrue(result.isSuccess)
-        val scanResult = result.getOrNull()!!
+        val scanResult = updates.filterIsInstance<ScanStatus.Completed>().single().result
         assertEquals("/test", scanResult.rootPath)
         assertEquals(300, scanResult.totalSize)
         assertEquals(2, scanResult.fileCount)
@@ -63,11 +65,11 @@ class ScanDirectoryUseCaseTest {
         repository.addFile(testNode)
 
         // When
-        val result = useCase.execute("/test")
-
-        // Then
-        assertTrue(result.isSuccess)
-        val scanResult = result.getOrNull()!!
+        val scanResult = useCase.scan("/test")
+            .toList()
+            .filterIsInstance<ScanStatus.Completed>()
+            .single()
+            .result
         assertEquals(2, scanResult.directoryCount)
         assertEquals(0, scanResult.fileCount)
     }
@@ -75,10 +77,10 @@ class ScanDirectoryUseCaseTest {
     @Test
     fun `should return error when directory not found`() = runTest {
         // When
-        val result = useCase.execute("/nonexistent")
-
-        // Then
-        assertTrue(result.isFailure)
+        val exception = assertFailsWith<Exception> {
+            useCase.scan("/nonexistent").toList()
+        }
+        assertTrue(exception.message?.contains("not found") == true)
     }
 
     @Test
@@ -88,11 +90,11 @@ class ScanDirectoryUseCaseTest {
         repository.addFile(testNode)
 
         // When
-        val result = useCase.execute("/test")
-
-        // Then
-        assertTrue(result.isSuccess)
-        val scanResult = result.getOrNull()!!
+        val scanResult = useCase.scan("/test")
+            .toList()
+            .filterIsInstance<ScanStatus.Completed>()
+            .single()
+            .result
         assertTrue(scanResult.errors.isEmpty())
         assertTrue(scanResult.isSuccessful())
     }
@@ -112,10 +114,11 @@ class ScanDirectoryUseCaseTest {
         repository.addFile(testNode)
         repository.markInaccessible(child.path)
 
-        val result = useCase.execute("/test")
-
-        assertTrue(result.isSuccess)
-        val scanResult = result.getOrNull()!!
+        val scanResult = useCase.scan("/test")
+            .toList()
+            .filterIsInstance<ScanStatus.Completed>()
+            .single()
+            .result
         assertEquals(1, scanResult.errors.size)
         assertFalse(scanResult.isSuccessful())
     }
@@ -127,11 +130,11 @@ class ScanDirectoryUseCaseTest {
         repository.addFile(testNode)
 
         // When
-        val result = useCase.execute("/test")
-
-        // Then
-        assertTrue(result.isSuccess)
-        val scanResult = result.getOrNull()!!
+        val scanResult = useCase.scan("/test")
+            .toList()
+            .filterIsInstance<ScanStatus.Completed>()
+            .single()
+            .result
         assertTrue(scanResult.scanDurationMs >= 0)
     }
 
@@ -145,13 +148,32 @@ class ScanDirectoryUseCaseTest {
         repository.addFile(testNode)
 
         // When
-        val result = useCase.execute("/test")
-
-        // Then
-        assertTrue(result.isSuccess)
-        val scanResult = result.getOrNull()!!
+        val scanResult = useCase.scan("/test")
+            .toList()
+            .filterIsInstance<ScanStatus.Completed>()
+            .single()
+            .result
         assertEquals(500, scanResult.totalSize)
         assertEquals(1, scanResult.fileCount)
         assertEquals(2, scanResult.directoryCount) // sub1 and sub2
+    }
+
+    @Test
+    fun `should forward progress updates`() = runTest {
+        val deepFile = FileNode("/test/sub/file.txt", "file.txt", 100, false, emptyList(), 0L)
+        val subDir = FileNode("/test/sub", "sub", 0, true, listOf(deepFile), 0L)
+        val sibling = FileNode("/test/other.txt", "other.txt", 50, false, emptyList(), 0L)
+        val root = FileNode("/test", "test", 0, true, listOf(subDir, sibling), 0L)
+        repository.addFile(root)
+
+        val emissions = useCase.scan("/test").toList()
+        val progressUpdates = emissions.filterIsInstance<ScanStatus.Progress>().map { it.value }
+        assertTrue(progressUpdates.isNotEmpty())
+        val final = progressUpdates.last()
+        assertEquals(1, final.totalDirectories)
+        assertEquals(2, final.totalFiles)
+        assertEquals(final.totalDirectories, final.processedDirectories)
+        assertEquals(final.totalFiles, final.processedFiles)
+        assertTrue(emissions.any { it is ScanStatus.Completed })
     }
 }

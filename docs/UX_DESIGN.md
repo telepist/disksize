@@ -67,7 +67,7 @@
 ### UI Element Colors
 - **Header**: Cyan border and text
 - **Selected Item**: Green background or highlight
-- **Progress Bar**: Magenta
+- **Progress Bar**: Green (determinate)
 - **Status Messages**:
   - Success: Green
   - Warning: Yellow
@@ -169,16 +169,18 @@ Always use 1024-based units (binary), show one decimal place for GB/TB.
 
 ### Scanning Progress
 ```
-Scanning: /Users/username/Documents/Projects
-Progress: [████████████████░░░░░░] 65%
-Found: 1,234 files | 156 directories | 8.5 GB
+Scanning | /Users/username/Documents/Projects
+Progress: [██████████░░░░░░░░░░░░] 48.2% (142/295)
+Files 120/210 • Directories 22/85
+Directory: /Users/username/Documents/Projects/app
+File: /Users/username/Documents/Projects/app/src/Main.kt
 ```
 
 ### Indeterminate Progress
 For unknown duration:
 ```
-Scanning: /Users/username/Documents/Projects
-[⠋] Processing...
+Scanning / /Users/username/Documents/Projects
+Preparing directory statistics...
 ```
 
 ## Accessibility Considerations

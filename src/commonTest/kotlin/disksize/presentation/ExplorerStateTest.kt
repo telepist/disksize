@@ -1,8 +1,8 @@
 package disksize.presentation
 
 import disksize.domain.model.FileNode
+import disksize.domain.model.ScanProgress
 import disksize.domain.model.ScanResult
-import disksize.presentation.SortOrder
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -126,6 +126,42 @@ class ExplorerStateTest {
         assertEquals(1, state.spinnerIndex)
         val nextFrame = state.spinnerFrame
         assertTrue(nextFrame in charArrayOf('|', '/', '-', '\\'))
+    }
+
+    @Test
+    fun `withProgress stores latest loading progress`() {
+        val base = ExplorerState(currentPath = "/tmp", isLoading = true)
+        val progress = ScanProgress(
+            processedFiles = 3,
+            totalFiles = 10,
+            processedDirectories = 2,
+            totalDirectories = 5
+        )
+
+        val updated = base.withProgress(progress)
+
+        val expected = LoadingProgress.fromDomain(progress)
+        assertEquals(expected, updated.loadingProgress)
+    }
+
+    @Test
+    fun `withLoading resets previous progress`() {
+        val progress = LoadingProgress(
+            processedFiles = 1,
+            totalFiles = 5,
+            processedDirectories = 1,
+            totalDirectories = 3
+        )
+        val state = ExplorerState(
+            currentPath = "/tmp",
+            isLoading = false,
+            loadingProgress = progress
+        )
+
+        val reset = state.withLoading("/tmp")
+
+        assertEquals(null, reset.loadingProgress)
+        assertTrue(reset.isLoading)
     }
 
     private fun directory(

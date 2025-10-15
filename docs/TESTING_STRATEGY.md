@@ -118,26 +118,35 @@ class ScanDirectoryUseCaseTest {
         // Given
         val testPath = "/test/path"
         val expectedNode = TestData.createFileNode(testPath)
-        coEvery { repository.scanDirectory(testPath) } returns Result.success(expectedNode)
+        every { repository.scanDirectory(testPath) } returns flowOf(
+            DirectoryScanUpdate.Progress(ScanProgress(0, 10, 0, 2)),
+            DirectoryScanUpdate.Complete(
+                FileSystemRepository.DirectoryScanResult(
+                    root = expectedNode,
+                    errors = emptyList()
+                )
+            )
+        )
 
         // When
-        val result = useCase.execute(testPath)
+        val updates = useCase.scan(testPath).toList()
 
         // Then
-        assertThat(result.isSuccess).isTrue()
-        assertThat(result.getOrNull()?.rootNode).isEqualTo(expectedNode)
-        coVerify(exactly = 1) { repository.scanDirectory(testPath) }
+        val completed = updates.filterIsInstance<ScanStatus.Completed>().single()
+        assertThat(completed.result.rootNode).isEqualTo(expectedNode)
+        verify(exactly = 1) { repository.scanDirectory(testPath) }
     }
 
     @Test
     fun `should handle permission denied error`() = runTest {
         // Given
         val testPath = "/restricted"
-        coEvery { repository.scanDirectory(testPath) } returns
-            Result.failure(PermissionDeniedException(testPath))
+        every { repository.scanDirectory(testPath) } returns flow {
+            throw PermissionDeniedException(testPath)
+        }
 
         // When
-        val result = useCase.execute(testPath)
+        val result = runCatching { useCase.scan(testPath).toList() }
 
         // Then
         assertThat(result.isFailure).isTrue()
@@ -160,9 +169,18 @@ class FakeFileSystem : FileSystemRepository {
         files[path] = FakeFile(path, size, isDirectory)
     }
 
-    override suspend fun scanDirectory(path: String): Result<FileNode> {
-        val file = files[path] ?: return Result.failure(FileNotFoundException(path))
-        // Implementation...
+    override fun scanDirectory(path: String): Flow<DirectoryScanUpdate> = flow {
+        val file = files[path] ?: throw FileNotFoundException(path)
+        // Emit simple progress update for documentation purposes
+        emit(DirectoryScanUpdate.Progress(ScanProgress(0, 1, 0, 0, currentFile = path)))
+        emit(
+            DirectoryScanUpdate.Complete(
+                FileSystemRepository.DirectoryScanResult(
+                    root = file.toFileNode(),
+                    errors = emptyList()
+                )
+            )
+        )
     }
 }
 

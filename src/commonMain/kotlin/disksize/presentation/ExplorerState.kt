@@ -2,6 +2,7 @@ package disksize.presentation
 
 import disksize.domain.model.FileNode
 import disksize.domain.model.ScanResult
+import disksize.domain.model.ScanProgress
 
 /**
  * UI-facing state for the directory explorer.
@@ -13,7 +14,8 @@ data class ExplorerState(
     val errorMessage: String? = null,
     val selectedIndex: Int = 0,
     val sortOrder: SortOrder = SortOrder.SIZE_DESC,
-    val spinnerIndex: Int = 0
+    val spinnerIndex: Int = 0,
+    val loadingProgress: LoadingProgress? = null
 ) {
     val spinnerFrame: Char
         get() = SPINNER_FRAMES[spinnerIndex % SPINNER_FRAMES.size]
@@ -60,7 +62,8 @@ fun ExplorerState.withScanResult(scanResult: ScanResult): ExplorerState {
         scanResult = scanResult,
         isLoading = false,
         errorMessage = null,
-        spinnerIndex = 0
+        spinnerIndex = 0,
+        loadingProgress = null
     )
     val newDirectories = updated.directories
     val newIndex = previousSelectedPath?.let { path ->
@@ -76,7 +79,8 @@ fun ExplorerState.withLoading(path: String): ExplorerState {
         errorMessage = null,
         scanResult = null,
         selectedIndex = 0,
-        spinnerIndex = 0
+        spinnerIndex = 0,
+        loadingProgress = null
     )
 }
 
@@ -86,7 +90,8 @@ fun ExplorerState.withError(message: String): ExplorerState {
         errorMessage = message,
         scanResult = null,
         selectedIndex = 0,
-        spinnerIndex = 0
+        spinnerIndex = 0,
+        loadingProgress = null
     )
 }
 
@@ -102,6 +107,10 @@ fun ExplorerState.withNextSortOrder(): ExplorerState {
 }
 
 fun ExplorerState.tickSpinner(): ExplorerState = copy(spinnerIndex = spinnerIndex + 1)
+
+fun ExplorerState.withProgress(progress: ScanProgress): ExplorerState {
+    return copy(loadingProgress = LoadingProgress.fromDomain(progress))
+}
 
 enum class SortOrder(val label: String) {
     SIZE_DESC("Size ↓"),

@@ -129,17 +129,66 @@ private fun directoryLines(state: ExplorerState, width: Int): List<FrameLine> {
 
     when {
         state.isLoading -> {
-            val scanningText = "Scanning ${state.spinnerFrame} ${shortenPath(state.currentPath, innerWidth - 12)}"
-            val barWidth = max(6, innerWidth - "Progress: ".length)
+            val pathDisplay = shortenPath(state.currentPath, innerWidth - 12)
             lines += frameLine(width, listOf(
                 Segment("Scanning ", Color.Cyan),
                 Segment(state.spinnerFrame.toString(), Color.Yellow),
-                Segment(" ${shortenPath(state.currentPath, innerWidth - 12)}", Color.Cyan)
+                Segment(" $pathDisplay", Color.Cyan)
             ))
-            lines += frameLine(width, listOf(
-                Segment("Progress: ", Color.Cyan),
-                loadingProgressSegment(state.spinnerIndex, barWidth)
-            ))
+            val progress = state.loadingProgress
+            if (progress != null) {
+                if (progress.totalItems > 0) {
+                    val percent = (progress.completionFraction * 100.0).coerceIn(0.0, 100.0)
+                    val percentText = formatPercentage(percent)
+                    val statusText = " ${progress.processedItems}/${progress.totalItems} (${percentText}%)"
+                    val label = "Progress: "
+                    val availableForBar = (innerWidth - label.length - statusText.length).coerceAtLeast(0)
+                    val progressSegments = mutableListOf<Segment>()
+                    progressSegments += Segment(label, Color.Cyan)
+                    if (availableForBar >= 6) {
+                        progressSegments += determinateProgressSegment(progress.completionFraction, availableForBar)
+                        progressSegments += Segment(statusText, Color.Green)
+                    } else {
+                        progressSegments += Segment(statusText.trim(), Color.Green)
+                    }
+                    lines += frameLine(width, progressSegments)
+                }
+                val countText = buildString {
+                    append("Files ")
+                    if (progress.totalFiles > 0) {
+                        append("${progress.processedFiles}/${progress.totalFiles}")
+                    } else {
+                        append(progress.processedFiles)
+                    }
+                    append(" • Directories ")
+                    if (progress.totalDirectories > 0) {
+                        append("${progress.processedDirectories}/${progress.totalDirectories}")
+                    } else {
+                        append(progress.processedDirectories)
+                    }
+                }
+                lines += frameLine(width, listOf(Segment(countText, Color.Cyan)))
+                progress.currentDirectory?.let { dir ->
+                    val label = "Directory: "
+                    val available = (innerWidth - label.length).coerceAtLeast(0)
+                    val dirDisplay = shortenPath(dir, available)
+                    lines += frameLine(width, listOf(
+                        Segment(label, Color.Cyan),
+                        Segment(dirDisplay, Color.White)
+                    ))
+                }
+                progress.currentFile?.let { file ->
+                    val label = "File: "
+                    val available = (innerWidth - label.length).coerceAtLeast(0)
+                    val fileDisplay = shortenPath(file, available)
+                    lines += frameLine(width, listOf(
+                        Segment(label, Color.Cyan),
+                        Segment(fileDisplay, Color.White)
+                    ))
+                }
+            } else {
+                lines += frameLine(width, listOf(Segment("Preparing directory statistics...", Color.Cyan)))
+            }
             lines += frameLine(width, listOf(Segment("Collecting directory statistics...", Color.Cyan)))
         }
         state.errorMessage != null -> {
@@ -221,6 +270,11 @@ private fun statusLine(state: ExplorerState, width: Int): FrameLine {
             segments += Segment("Scanning ", Color.Cyan)
             segments += Segment(state.spinnerFrame.toString(), Color.Yellow)
             segments += Segment(" ${shortenPath(state.currentPath, innerWidth - 10)}", Color.Cyan)
+            state.loadingProgress?.takeIf { it.totalItems > 0 }?.let { progress ->
+                val percent = (progress.completionFraction * 100.0).coerceIn(0.0, 100.0)
+                val percentText = formatPercentage(percent)
+                segments += Segment(" • ${percentText}% (${progress.processedItems}/${progress.totalItems})", Color.Green)
+            }
         }
         state.errorMessage != null -> {
             segments += Segment("Error: ${state.errorMessage.take(innerWidth - 7)}", Color.Red)
@@ -291,19 +345,18 @@ private fun frameLine(width: Int, segments: List<Segment>): FrameLine {
     return FrameLine(listOf(Segment("║", Color.Cyan)) + trimmed + Segment("║", Color.Cyan))
 }
 
-private fun loadingProgressSegment(step: Int, width: Int): Segment {
+private fun determinateProgressSegment(fraction: Double, width: Int): Segment {
+    if (width <= 0) return Segment("")
     val inner = (width - 2).coerceAtLeast(1)
-    val range = inner * 2
-    val pulse = step % range
-    val filled = if (pulse <= inner) pulse else range - pulse
-    val safeFilled = filled.coerceIn(0, inner)
+    val clamped = fraction.coerceIn(0.0, 1.0)
+    val filled = (clamped * inner).roundToInt().coerceIn(0, inner)
     val text = buildString {
         append('[')
-        repeat(safeFilled) { append('█') }
-        repeat(inner - safeFilled) { append('░') }
+        repeat(filled) { append('█') }
+        repeat(inner - filled) { append('░') }
         append(']')
     }
-    return Segment(text, Color.Yellow)
+    return Segment(text, Color.Green)
 }
 
 private fun shortenPath(path: String, maxLength: Int): String {

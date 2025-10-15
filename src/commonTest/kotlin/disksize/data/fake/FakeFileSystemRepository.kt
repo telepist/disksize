@@ -1,9 +1,13 @@
 package disksize.data.fake
 
+import disksize.data.DirectoryScanUpdate
 import disksize.data.FileSystemRepository
+import disksize.domain.model.ErrorType
 import disksize.domain.model.FileNode
 import disksize.domain.model.ScanError
-import disksize.domain.model.ErrorType
+import disksize.domain.model.ScanProgress
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 
 /**
  * Fake implementation of FileSystemRepository for testing.
@@ -35,16 +39,15 @@ class FakeFileSystemRepository : FileSystemRepository {
         inaccessiblePaths.clear()
     }
 
-    override suspend fun scanDirectory(path: String): Result<FileSystemRepository.DirectoryScanResult> {
+    override fun scanDirectory(path: String): Flow<DirectoryScanUpdate> = flow {
         if (path in inaccessiblePaths) {
-            return Result.failure(Exception("Permission denied: $path"))
+            throw Exception("Permission denied: $path")
         }
 
-        val node = files[path]
-            ?: return Result.failure(Exception("Directory not found: $path"))
+        val node = files[path] ?: throw Exception("Directory not found: $path")
 
         if (!node.isDirectory) {
-            return Result.failure(Exception("Not a directory: $path"))
+            throw Exception("Not a directory: $path")
         }
 
         val errors = mutableListOf<ScanError>()
@@ -60,10 +63,28 @@ class FakeFileSystemRepository : FileSystemRepository {
             !denied
         }
 
-        return Result.success(
-            FileSystemRepository.DirectoryScanResult(
-                root = node.copy(children = sanitizedChildren),
-                errors = errors
+        val sanitizedRoot = node.copy(children = sanitizedChildren)
+        val totalFiles = sanitizedRoot.fileCount()
+        val totalDirectories = sanitizedRoot.directoryCount()
+        val tracker = ProgressTracker(
+            totalFiles = totalFiles,
+            totalDirectories = totalDirectories,
+            emitProgress = { progress ->
+                emit(DirectoryScanUpdate.Progress(progress))
+            }
+        )
+
+        tracker.onRootEntered(sanitizedRoot.path)
+        for (child in sanitizedRoot.children) {
+            traverseForProgress(child, tracker)
+        }
+
+        emit(
+            DirectoryScanUpdate.Complete(
+                FileSystemRepository.DirectoryScanResult(
+                    root = sanitizedRoot,
+                    errors = errors
+                )
             )
         )
     }
@@ -88,5 +109,59 @@ class FakeFileSystemRepository : FileSystemRepository {
 
     override suspend fun isAccessible(path: String): Boolean {
         return path !in inaccessiblePaths && exists(path)
+    }
+}
+
+private class ProgressTracker(
+    private val totalFiles: Int,
+    private val totalDirectories: Int,
+    private val emitProgress: suspend (ScanProgress) -> Unit
+) {
+    private var processedFiles: Int = 0
+    private var processedDirectories: Int = 0
+    private var currentDirectory: String? = null
+    private var currentFile: String? = null
+
+    private suspend fun emit() {
+        emitProgress(
+            ScanProgress(
+                processedFiles = processedFiles,
+                totalFiles = totalFiles,
+                processedDirectories = processedDirectories,
+                totalDirectories = totalDirectories,
+                currentDirectory = currentDirectory,
+                currentFile = currentFile
+            )
+        )
+    }
+
+    suspend fun onRootEntered(path: String) {
+        currentDirectory = path
+        currentFile = null
+        emit()
+    }
+
+    suspend fun onDirectoryProcessed(path: String) {
+        processedDirectories++
+        currentDirectory = path
+        currentFile = null
+        emit()
+    }
+
+    suspend fun onFileProcessed(path: String) {
+        processedFiles++
+        currentFile = path
+        emit()
+    }
+}
+
+private suspend fun traverseForProgress(node: FileNode, tracker: ProgressTracker) {
+    if (node.isDirectory) {
+        tracker.onDirectoryProcessed(node.path)
+        node.children.forEach { child ->
+            traverseForProgress(child, tracker)
+        }
+    } else {
+        tracker.onFileProcessed(node.path)
     }
 }

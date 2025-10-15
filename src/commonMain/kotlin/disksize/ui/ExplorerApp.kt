@@ -10,6 +10,7 @@ import androidx.compose.runtime.setValue
 import disksize.domain.model.FileNode
 import disksize.domain.model.ScanError
 import disksize.domain.model.ScanResult
+import disksize.domain.model.ScanStatus
 import disksize.domain.usecase.ScanDirectoryUseCase
 import disksize.presentation.ExplorerState
 import disksize.presentation.resetSelection
@@ -19,13 +20,15 @@ import disksize.presentation.withLoading
 import disksize.presentation.withScanResult
 import disksize.presentation.withSelection
 import disksize.presentation.withNextSortOrder
+import disksize.presentation.withProgress
 import disksize.util.normalizePath
 import disksize.util.parentPath
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.flowOn
 import kotlin.system.exitProcess
 
 @Composable
@@ -47,18 +50,28 @@ fun DiskSizeApp(
     LaunchedEffect(pendingScan) {
         val path = pendingScan ?: return@LaunchedEffect
         state = state.withLoading(path)
-        val result = withContext(Dispatchers.Default) {
-            scanDirectoryUseCase.execute(path)
-        }
-        state = result.fold(
-            onSuccess = { scanResult ->
-                state.withScanResult(scanResult).resetSelection()
-            },
-            onFailure = { throwable ->
-                val message = throwable.message ?: "Failed to scan $path"
-                state.withError(message)
+        val result = try {
+            scanDirectoryUseCase
+                .scan(path)
+                .flowOn(Dispatchers.Default)
+                .collect { update ->
+                when (update) {
+                    is ScanStatus.Progress -> {
+                        state = state.withProgress(update.value)
+                    }
+                    is ScanStatus.Completed -> {
+                        state = state.withScanResult(update.result).resetSelection()
+                    }
+                }
             }
-        )
+            null
+        } catch (throwable: Throwable) {
+            throwable
+        }
+        result?.let { error ->
+            val message = error.message ?: "Failed to scan $path"
+            state = state.withError(message)
+        }
         pendingScan = null
         history = emptyList()
     }
