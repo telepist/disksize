@@ -16,7 +16,7 @@ data class ExplorerState(
     val sortOrder: SortOrder = SortOrder.SIZE_DESC,
     val spinnerIndex: Int = 0,
     val loadingProgress: LoadingProgress? = null,
-    val directoryItems: List<DirectoryItem> = emptyList(),
+    val browserItems: List<BrowserItem> = emptyList(),
     val childDirectoryTotalSize: Long = 0L
 ) {
     val spinnerFrame: Char
@@ -26,22 +26,23 @@ data class ExplorerState(
     val fileCount: Int = scanResult?.fileCount ?: 0
     val directoryCount: Int = scanResult?.directoryCount ?: 0
     val scanDurationMs: Long = scanResult?.scanDurationMs ?: 0L
-    val selectedDirectory: FileNode? = directoryItems.getOrNull(selectedIndex)?.node
+    val selectedItem: BrowserItem? = browserItems.getOrNull(selectedIndex)
+    val selectedDirectory: FileNode? = selectedItem?.takeIf { it.kind == BrowserItemKind.DIRECTORY }?.node
     val warningCount: Int = scanResult?.errors?.size ?: 0
 }
 
 fun ExplorerState.withSelection(newIndex: Int): ExplorerState {
-    if (directoryItems.isEmpty()) return copy(selectedIndex = 0)
-    val bounded = newIndex.coerceIn(0, directoryItems.lastIndex)
+    if (browserItems.isEmpty()) return copy(selectedIndex = 0)
+    val bounded = newIndex.coerceIn(0, browserItems.lastIndex)
     return copy(selectedIndex = bounded)
 }
 
 fun ExplorerState.resetSelection(): ExplorerState = copy(selectedIndex = 0)
 
 fun ExplorerState.withScanResult(scanResult: ScanResult): ExplorerState {
-    val previousSelectedPath = directoryItems.getOrNull(selectedIndex)?.node?.path
-    val items = buildDirectoryItems(scanResult.rootNode, sortOrder)
-    val totalChildSize = items.sumOf(DirectoryItem::totalSize)
+    val previousSelectedPath = browserItems.getOrNull(selectedIndex)?.node?.path
+    val items = buildBrowserItems(scanResult.rootNode, sortOrder)
+    val totalChildSize = items.filter { it.kind == BrowserItemKind.DIRECTORY }.sumOf(BrowserItem::totalSize)
     val updated = copy(
         currentPath = scanResult.rootPath,
         scanResult = scanResult,
@@ -49,10 +50,10 @@ fun ExplorerState.withScanResult(scanResult: ScanResult): ExplorerState {
         errorMessage = null,
         spinnerIndex = 0,
         loadingProgress = null,
-        directoryItems = items,
+        browserItems = items,
         childDirectoryTotalSize = totalChildSize
     )
-    val newItems = updated.directoryItems
+    val newItems = updated.browserItems
     val newIndex = previousSelectedPath?.let { path ->
         newItems.indexOfFirst { it.node.path == path }
     }?.takeIf { it >= 0 } ?: 0
@@ -68,7 +69,7 @@ fun ExplorerState.withLoading(path: String): ExplorerState {
         selectedIndex = 0,
         spinnerIndex = 0,
         loadingProgress = null,
-        directoryItems = emptyList(),
+        browserItems = emptyList(),
         childDirectoryTotalSize = 0L
     )
 }
@@ -81,22 +82,22 @@ fun ExplorerState.withError(message: String): ExplorerState {
         selectedIndex = 0,
         spinnerIndex = 0,
         loadingProgress = null,
-        directoryItems = emptyList(),
+        browserItems = emptyList(),
         childDirectoryTotalSize = 0L
     )
 }
 
 fun ExplorerState.withNextSortOrder(): ExplorerState {
     val newOrder = sortOrder.next()
-    val selectedPath = directoryItems.getOrNull(selectedIndex)?.node?.path
-    val resortedItems = sortDirectoryItems(directoryItems, newOrder)
-    val totalChildSize = resortedItems.sumOf(DirectoryItem::totalSize)
+    val selectedPath = browserItems.getOrNull(selectedIndex)?.node?.path
+    val resortedItems = sortBrowserItems(browserItems, newOrder)
+    val totalChildSize = resortedItems.filter { it.kind == BrowserItemKind.DIRECTORY }.sumOf(BrowserItem::totalSize)
     val newIndex = selectedPath?.let { path ->
         resortedItems.indexOfFirst { it.node.path == path }
     }?.takeIf { it >= 0 } ?: 0
     return copy(
         sortOrder = newOrder,
-        directoryItems = resortedItems,
+        browserItems = resortedItems,
         childDirectoryTotalSize = totalChildSize,
         selectedIndex = newIndex
     )
@@ -108,28 +109,35 @@ fun ExplorerState.withProgress(progress: ScanProgress): ExplorerState {
     return copy(loadingProgress = LoadingProgress.fromDomain(progress))
 }
 
-data class DirectoryItem(
+data class BrowserItem(
     val node: FileNode,
-    val totalSize: Long
+    val totalSize: Long,
+    val kind: BrowserItemKind
 )
 
-private fun buildDirectoryItems(root: FileNode, sortOrder: SortOrder): List<DirectoryItem> {
-    val children = root.children.filter(FileNode::isDirectory)
-    val items = children.map { child ->
-        DirectoryItem(node = child, totalSize = child.totalSize())
+enum class BrowserItemKind { DIRECTORY, FILE }
+
+private fun buildBrowserItems(root: FileNode, sortOrder: SortOrder): List<BrowserItem> {
+    val directories = root.children.filter(FileNode::isDirectory).map { child ->
+        BrowserItem(node = child, totalSize = child.totalSize(), kind = BrowserItemKind.DIRECTORY)
     }
-    return sortDirectoryItems(items, sortOrder)
+    val files = root.children.filterNot(FileNode::isDirectory).map { file ->
+        BrowserItem(node = file, totalSize = file.totalSize(), kind = BrowserItemKind.FILE)
+    }
+    val sortedDirs = sortBrowserItems(directories, sortOrder)
+    val sortedFiles = sortBrowserItems(files, sortOrder)
+    return sortedDirs + sortedFiles
 }
 
-private fun sortDirectoryItems(items: List<DirectoryItem>, sortOrder: SortOrder): List<DirectoryItem> {
+private fun sortBrowserItems(items: List<BrowserItem>, sortOrder: SortOrder): List<BrowserItem> {
     return when (sortOrder) {
         SortOrder.SIZE_DESC -> items.sortedWith(
-            compareByDescending<DirectoryItem> { it.totalSize }
+            compareByDescending<BrowserItem> { it.totalSize }
                 .thenBy { it.node.name.lowercase() }
         )
         SortOrder.NAME_ASC -> items.sortedBy { it.node.name.lowercase() }
         SortOrder.DATE_DESC -> items.sortedWith(
-            compareByDescending<DirectoryItem> { it.node.lastModified }
+            compareByDescending<BrowserItem> { it.node.lastModified }
                 .thenBy { it.node.name.lowercase() }
         )
     }

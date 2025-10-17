@@ -33,7 +33,7 @@ class ExplorerStateTest {
         val initial = ExplorerState(currentPath = "/tmp", selectedIndex = 2)
         val updated = initial.withScanResult(scanResult).resetSelection()
 
-        val names = updated.directoryItems.map { it.node.name }
+        val names = updated.browserItems.map { it.node.name }
         assertEquals(listOf("b", "c", "a"), names)
         assertEquals(0, updated.selectedIndex)
         assertEquals(600, updated.totalSize)
@@ -88,16 +88,44 @@ class ExplorerStateTest {
 
         var state = ExplorerState(currentPath = "/root").withScanResult(scanResult)
         // Initially sorted by size desc (size, date, alpha)
-        assertEquals(listOf("size", "date", "alpha"), state.directoryItems.map { it.node.name })
+        assertEquals(listOf("size", "date", "alpha"), state.browserItems.map { it.node.name })
 
         state = state.withNextSortOrder()
         assertEquals(SortOrder.NAME_ASC, state.sortOrder)
-        assertEquals(listOf("alpha", "date", "size"), state.directoryItems.map { it.node.name })
+        assertEquals(listOf("alpha", "date", "size"), state.browserItems.map { it.node.name })
 
         state = state.withNextSortOrder()
         assertEquals(SortOrder.DATE_DESC, state.sortOrder)
-        assertEquals(listOf("date", "alpha", "size"), state.directoryItems.map { it.node.name })
+        assertEquals(listOf("date", "alpha", "size"), state.browserItems.map { it.node.name })
         assertEquals(600, state.childDirectoryTotalSize)
+    }
+
+    @Test
+    fun `withScanResult includes files after directories`() {
+        val scanResult = ScanResult(
+            rootPath = "/root",
+            totalSize = 450,
+            fileCount = 2,
+            directoryCount = 2,
+            rootNode = directory(
+                path = "/root",
+                name = "root",
+                children = listOf(
+                    directory("/root/dirA", "dirA", size = 200),
+                    file("/root/readme.md", "readme.md", size = 50),
+                    directory("/root/dirB", "dirB", size = 150),
+                    file("/root/todo.txt", "todo.txt", size = 25)
+                )
+            ),
+            scanDurationMs = 10,
+            errors = emptyList()
+        )
+
+        val state = ExplorerState(currentPath = "/root").withScanResult(scanResult)
+
+        val names = state.browserItems.map { it.node.name }
+        assertEquals(listOf("dirA", "dirB", "readme.md", "todo.txt"), names)
+        assertEquals(350, state.childDirectoryTotalSize)
     }
 
     @Test
@@ -178,6 +206,22 @@ class ExplorerStateTest {
             size = size,
             isDirectory = true,
             children = children,
+            lastModified = lastModified
+        )
+    }
+
+    private fun file(
+        path: String,
+        name: String,
+        size: Long,
+        lastModified: Long = 0L
+    ): FileNode {
+        return FileNode(
+            path = path,
+            name = name,
+            size = size,
+            isDirectory = false,
+            children = emptyList(),
             lastModified = lastModified
         )
     }

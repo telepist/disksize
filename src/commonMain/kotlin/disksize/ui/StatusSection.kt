@@ -1,6 +1,7 @@
 package disksize.ui
 
 import com.jakewharton.mosaic.ui.Color
+import disksize.presentation.BrowserItemKind
 import disksize.presentation.ExplorerState
 import disksize.util.SizeFormatter
 
@@ -28,10 +29,11 @@ internal fun statusLine(state: ExplorerState, width: Int): FrameLine {
             if (state.warningCount > 0) {
                 segments += Segment(" • ${state.warningCount} warning(s)", Color.Yellow)
             }
-            state.selectedDirectory?.let {
-                val size = SizeFormatter.format(it.totalSize())
-                val name = shortenPath(it.name, innerWidth - base.length - 25)
-                segments += Segment(" • Selected: $name ($size)", Color.Cyan)
+            state.selectedItem?.let { item ->
+                val size = SizeFormatter.format(item.totalSize)
+                val name = shortenPath(item.node.name, innerWidth - base.length - 25)
+                val label = if (item.kind == BrowserItemKind.DIRECTORY) "Selected" else "File"
+                segments += Segment(" • $label: $name ($size)", Color.Cyan)
             }
         }
         else -> segments += Segment("Idle", Color.Cyan)

@@ -88,7 +88,7 @@ fun DiskSizeApp(
     MainScreen(
         state = state,
         onMoveSelection = { delta ->
-            val items = state.directoryItems
+            val items = state.browserItems
             if (items.isEmpty()) return@MainScreen
             val next = state.selectedIndex + delta
             val bounded = next.coerceIn(0, items.lastIndex)
@@ -97,7 +97,8 @@ fun DiskSizeApp(
             }
         },
         onOpenSelected = {
-            val selectedItem = state.directoryItems.getOrNull(state.selectedIndex) ?: return@MainScreen
+            val selectedItem = state.browserItems.getOrNull(state.selectedIndex) ?: return@MainScreen
+            if (!selectedItem.node.isDirectory) return@MainScreen
             val selected = selectedItem.node
             val currentScan = state.scanResult ?: return@MainScreen
             history = history + state.copy()

@@ -1,7 +1,8 @@
 package disksize.ui
 
 import com.jakewharton.mosaic.ui.Color
-import disksize.presentation.DirectoryItem
+import disksize.presentation.BrowserItem
+import disksize.presentation.BrowserItemKind
 import disksize.presentation.ExplorerState
 import disksize.presentation.LoadingProgress
 import disksize.util.SizeFormatter
@@ -22,13 +23,16 @@ internal fun directorySection(state: ExplorerState, width: Int): List<FrameLine>
             val message = state.errorMessage.take(innerWidth - 2)
             lines += frameLine(width, listOf(Segment("Error: $message", Color.Red)))
         }
-        state.directoryItems.isEmpty() -> {
-            lines += frameLine(width, listOf(Segment("(no subdirectories found)", Color.Cyan)))
+        state.browserItems.isEmpty() -> {
+            lines += frameLine(width, listOf(Segment("(no entries found)", Color.Cyan)))
         }
         else -> {
             val totalSize = state.childDirectoryTotalSize.coerceAtLeast(1L)
-            state.directoryItems.forEachIndexed { index, item ->
-                lines += directoryLine(width, item, totalSize, index == state.selectedIndex)
+            state.browserItems.forEachIndexed { index, item ->
+                when (item.kind) {
+                    BrowserItemKind.DIRECTORY -> lines += directoryLine(width, item, totalSize, index == state.selectedIndex)
+                    BrowserItemKind.FILE -> lines += fileLine(width, item, index == state.selectedIndex)
+                }
             }
             if (state.warningCount > 0) {
                 lines += frameLine(width, listOf(Segment("Warnings: ${state.warningCount} item(s) skipped", Color.Yellow)))
@@ -108,7 +112,7 @@ private fun progressCountsLabel(progress: LoadingProgress): String =
         }
     }
 
-private fun directoryLine(width: Int, item: DirectoryItem, totalParentSize: Long, isSelected: Boolean): FrameLine {
+private fun directoryLine(width: Int, item: BrowserItem, totalParentSize: Long, isSelected: Boolean): FrameLine {
     val innerWidth = width - 2
     val selector = if (isSelected) ">" else " "
     val node = item.node
@@ -142,6 +146,31 @@ private fun directoryLine(width: Int, item: DirectoryItem, totalParentSize: Long
         segments += Segment(" ")
         segments += usageBarSegment(barWidth, percentage, isSelected)
     }
+
+    return frameLine(width, segments)
+}
+
+private fun fileLine(width: Int, item: BrowserItem, isSelected: Boolean): FrameLine {
+    val innerWidth = width - 2
+    val selector = if (isSelected) ">" else " "
+    val name = item.node.name
+    val size = SizeFormatter.format(item.totalSize)
+    val labelColor = if (isSelected) Color.Green else Color.White
+    val sizeColor = when {
+        item.totalSize >= 1_000_000_000 -> Color.Red
+        item.totalSize >= 100_000_000 -> Color.Yellow
+        item.totalSize >= 10_000_000 -> Color.Cyan
+        else -> Color.White
+    }
+
+    val sizePart = size
+    val availableForLabel = (innerWidth - sizePart.length - 3).coerceAtLeast(0)
+    val label = truncateWithEllipsis("$selector $name", availableForLabel)
+
+    val segments = mutableListOf<Segment>()
+    segments += Segment(label, labelColor)
+    segments += Segment(" ")
+    segments += Segment(sizePart, sizeColor)
 
     return frameLine(width, segments)
 }
