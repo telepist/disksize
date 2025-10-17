@@ -12,10 +12,12 @@ internal fun buildScreenLines(state: ExplorerState, width: Int, rows: Int): List
     lines += blankLine(width)
     lines += statsSection(state, width)
     lines += blankLine(width)
-    lines += directorySection(state, width)
 
     val reservedForStatus = 3
     val targetVisibleRows = (rows - 1).coerceAtLeast(0)
+    val spaceForDirectory = (targetVisibleRows - lines.size).coerceAtLeast(0)
+    lines += directorySection(state, width, spaceForDirectory)
+
     val fillerCount = targetVisibleRows - (lines.size + reservedForStatus)
     if (fillerCount > 0) {
         repeat(fillerCount) { lines += blankLine(width) }

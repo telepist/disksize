@@ -12,44 +12,141 @@ import kotlin.math.roundToInt
 
 private const val PROGRESS_BAR_TARGET = 24
 
-internal fun directorySection(state: ExplorerState, width: Int): List<FrameLine> {
+internal fun directorySection(state: ExplorerState, width: Int, maxRows: Int): List<FrameLine> {
+    if (maxRows <= 0) return emptyList()
+
     val innerWidth = width - 2
     val lines = mutableListOf<FrameLine>()
-    lines += frameLine(width, listOf(Segment("Directories (Sort: ${state.sortOrder.label})", Color.Cyan)))
+
+    fun remainingCapacity(): Int = maxRows - lines.size
+    fun add(line: FrameLine) {
+        if (remainingCapacity() > 0) {
+            lines += line
+        }
+    }
+
+    add(frameLine(width, listOf(Segment("Entries (Sort: ${state.sortOrder.label})", Color.Cyan))))
+    if (remainingCapacity() <= 0) return lines
 
     when {
-        state.isLoading -> lines += loadingLines(state, width, innerWidth)
+        state.isLoading -> lines += loadingLines(state, width, innerWidth, remainingCapacity())
         state.errorMessage != null -> {
             val message = state.errorMessage.take(innerWidth - 2)
-            lines += frameLine(width, listOf(Segment("Error: $message", Color.Red)))
+            add(frameLine(width, listOf(Segment("Error: $message", Color.Red))))
         }
         state.browserItems.isEmpty() -> {
-            lines += frameLine(width, listOf(Segment("(no entries found)", Color.Cyan)))
+            add(frameLine(width, listOf(Segment("(no entries found)", Color.Cyan))))
         }
         else -> {
-            val totalSize = state.childDirectoryTotalSize.coerceAtLeast(1L)
-            state.browserItems.forEachIndexed { index, item ->
-                when (item.kind) {
-                    BrowserItemKind.DIRECTORY -> lines += directoryLine(width, item, totalSize, index == state.selectedIndex)
-                    BrowserItemKind.FILE -> lines += fileLine(width, item, index == state.selectedIndex)
-                }
-            }
-            if (state.warningCount > 0) {
-                lines += frameLine(width, listOf(Segment("Warnings: ${state.warningCount} item(s) skipped", Color.Yellow)))
+            val contentLines = browserLines(
+                state = state,
+                width = width,
+                innerWidth = innerWidth,
+                capacity = remainingCapacity()
+            )
+            lines.addAll(contentLines)
+            if (state.warningCount > 0 && remainingCapacity() > 0) {
+                add(frameLine(width, listOf(Segment("Warnings: ${state.warningCount} item(s) skipped", Color.Yellow))))
             }
         }
     }
+
     return lines
 }
 
-private fun loadingLines(state: ExplorerState, width: Int, innerWidth: Int): List<FrameLine> {
+private fun browserLines(
+    state: ExplorerState,
+    width: Int,
+    innerWidth: Int,
+    capacity: Int
+): List<FrameLine> {
+    if (capacity <= 0) return emptyList()
+    val items = state.browserItems
+    val totalItems = items.size
+    if (totalItems == 0) return emptyList()
+
     val lines = mutableListOf<FrameLine>()
+    fun add(line: FrameLine) {
+        if (lines.size < capacity) {
+            lines += line
+        }
+    }
+
+    val selectedIndex = state.selectedIndex.coerceIn(0, totalItems - 1)
+    var availableForItems = min(capacity, totalItems)
+    var startIndex = 0
+    var endIndex = totalItems
+    var indicatorTop = false
+    var indicatorBottom = false
+
+    if (totalItems > capacity) {
+        var indicatorSlots = when {
+            capacity >= 3 -> 2
+            capacity == 2 -> 1
+            else -> 0
+        }
+        availableForItems = (capacity - indicatorSlots).coerceAtLeast(1)
+        startIndex = (selectedIndex - availableForItems / 2).coerceAtLeast(0)
+        endIndex = (startIndex + availableForItems).coerceAtMost(totalItems)
+        startIndex = (endIndex - availableForItems).coerceAtLeast(0)
+        indicatorTop = startIndex > 0 && indicatorSlots > 0
+        indicatorBottom = endIndex < totalItems && indicatorSlots > 0
+
+        val usedIndicatorSlots = (if (indicatorTop) 1 else 0) + (if (indicatorBottom) 1 else 0)
+        availableForItems = (capacity - usedIndicatorSlots).coerceAtLeast(1)
+        startIndex = (selectedIndex - availableForItems / 2).coerceAtLeast(0)
+        endIndex = (startIndex + availableForItems).coerceAtMost(totalItems)
+        startIndex = (endIndex - availableForItems).coerceAtLeast(0)
+        indicatorTop = startIndex > 0 && usedIndicatorSlots > 0
+        indicatorBottom = endIndex < totalItems && usedIndicatorSlots > 0
+    } else {
+        startIndex = 0
+        endIndex = totalItems
+    }
+
+    if (indicatorTop && lines.size < capacity) {
+        add(indicatorLine(width, "↑ ${startIndex} more"))
+    }
+
+    val totalDirectorySize = state.childDirectoryTotalSize.coerceAtLeast(1L)
+    for (index in startIndex until endIndex) {
+        if (lines.size >= capacity) break
+        val item = items[index]
+        val line = when (item.kind) {
+            BrowserItemKind.DIRECTORY -> directoryLine(width, item, totalDirectorySize, index == state.selectedIndex)
+            BrowserItemKind.FILE -> fileLine(width, item, index == state.selectedIndex)
+        }
+        add(line)
+    }
+
+    if (indicatorBottom && lines.size < capacity) {
+        add(indicatorLine(width, "↓ ${totalItems - endIndex} more"))
+    }
+
+    return lines
+}
+
+private fun loadingLines(
+    state: ExplorerState,
+    width: Int,
+    innerWidth: Int,
+    capacity: Int
+): List<FrameLine> {
+    if (capacity <= 0) return emptyList()
+    val lines = mutableListOf<FrameLine>()
+
+    fun add(line: FrameLine) {
+        if (lines.size < capacity) {
+            lines += line
+        }
+    }
+
     val pathDisplay = shortenPath(state.currentPath, innerWidth - 12)
-    lines += frameLine(width, listOf(
+    add(frameLine(width, listOf(
         Segment("Scanning ", Color.Cyan),
         Segment(state.spinnerFrame.toString(), Color.Yellow),
         Segment(" $pathDisplay", Color.Cyan)
-    ))
+    )))
 
     val progress = state.loadingProgress
     if (progress != null) {
@@ -67,32 +164,32 @@ private fun loadingLines(state: ExplorerState, width: Int, innerWidth: Int): Lis
             } else {
                 progressSegments += Segment(statusText.trim(), Color.Green)
             }
-            lines += frameLine(width, progressSegments)
+            add(frameLine(width, progressSegments))
         }
-        lines += frameLine(width, listOf(Segment(progressCountsLabel(progress), Color.Cyan)))
+        add(frameLine(width, listOf(Segment(progressCountsLabel(progress), Color.Cyan))))
         progress.currentDirectory?.let { dir ->
             val label = "Directory: "
             val available = (innerWidth - label.length).coerceAtLeast(0)
             val dirDisplay = shortenPath(dir, available)
-            lines += frameLine(width, listOf(
+            add(frameLine(width, listOf(
                 Segment(label, Color.Cyan),
                 Segment(dirDisplay, Color.White)
-            ))
+            )))
         }
         progress.currentFile?.let { file ->
             val label = "File: "
             val available = (innerWidth - label.length).coerceAtLeast(0)
             val fileDisplay = shortenPath(file, available)
-            lines += frameLine(width, listOf(
+            add(frameLine(width, listOf(
                 Segment(label, Color.Cyan),
                 Segment(fileDisplay, Color.White)
-            ))
+            )))
         }
     } else {
-        lines += frameLine(width, listOf(Segment("Preparing directory statistics...", Color.Cyan)))
+        add(frameLine(width, listOf(Segment("Preparing directory statistics...", Color.Cyan))))
     }
 
-    lines += frameLine(width, listOf(Segment("Collecting directory statistics...", Color.Cyan)))
+    add(frameLine(width, listOf(Segment("Collecting directory statistics...", Color.Cyan))))
     return lines
 }
 
@@ -187,3 +284,6 @@ private fun usageBarSegment(width: Int, percentage: Double, highlight: Boolean):
     val color = if (highlight) Color.Green else Color.Magenta
     return Segment(text, color)
 }
+
+private fun indicatorLine(width: Int, message: String): FrameLine =
+    frameLine(width, listOf(Segment(message, Color.Cyan)))
