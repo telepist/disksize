@@ -17,7 +17,8 @@ data class ExplorerState(
     val spinnerIndex: Int = 0,
     val loadingProgress: LoadingProgress? = null,
     val browserItems: List<BrowserItem> = emptyList(),
-    val childDirectoryTotalSize: Long = 0L
+    val childDirectoryTotalSize: Long = 0L,
+    val loadingDirectoryPath: String? = null
 ) {
     val spinnerFrame: Char
         get() = SPINNER_FRAMES[spinnerIndex % SPINNER_FRAMES.size]
@@ -51,7 +52,8 @@ fun ExplorerState.withScanResult(scanResult: ScanResult): ExplorerState {
         spinnerIndex = 0,
         loadingProgress = null,
         browserItems = items,
-        childDirectoryTotalSize = totalChildSize
+        childDirectoryTotalSize = totalChildSize,
+        loadingDirectoryPath = null
     )
     val newItems = updated.browserItems
     val newIndex = previousSelectedPath?.let { path ->
@@ -70,7 +72,8 @@ fun ExplorerState.withLoading(path: String): ExplorerState {
         spinnerIndex = 0,
         loadingProgress = null,
         browserItems = emptyList(),
-        childDirectoryTotalSize = 0L
+        childDirectoryTotalSize = 0L,
+        loadingDirectoryPath = null
     )
 }
 
@@ -83,7 +86,8 @@ fun ExplorerState.withError(message: String): ExplorerState {
         spinnerIndex = 0,
         loadingProgress = null,
         browserItems = emptyList(),
-        childDirectoryTotalSize = 0L
+        childDirectoryTotalSize = 0L,
+        loadingDirectoryPath = null
     )
 }
 
@@ -106,7 +110,12 @@ fun ExplorerState.withNextSortOrder(): ExplorerState {
 fun ExplorerState.tickSpinner(): ExplorerState = copy(spinnerIndex = spinnerIndex + 1)
 
 fun ExplorerState.withProgress(progress: ScanProgress): ExplorerState {
-    return copy(loadingProgress = LoadingProgress.fromDomain(progress))
+    val updatedProgress = LoadingProgress.fromDomain(progress)
+    val directoryPath = progress.currentDirectory ?: loadingDirectoryPath
+    return copy(
+        loadingProgress = updatedProgress,
+        loadingDirectoryPath = directoryPath
+    )
 }
 
 data class BrowserItem(

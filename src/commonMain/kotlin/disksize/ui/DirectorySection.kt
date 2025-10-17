@@ -167,26 +167,18 @@ private fun loadingLines(
             add(frameLine(width, progressSegments))
         }
         add(frameLine(width, listOf(Segment(progressCountsLabel(progress), Color.Cyan))))
-        progress.currentDirectory?.let { dir ->
-            val label = "Directory: "
-            val available = (innerWidth - label.length).coerceAtLeast(0)
-            val dirDisplay = shortenPath(dir, available)
-            add(frameLine(width, listOf(
-                Segment(label, Color.Cyan),
-                Segment(dirDisplay, Color.White)
-            )))
-        }
-        progress.currentFile?.let { file ->
-            val label = "File: "
-            val available = (innerWidth - label.length).coerceAtLeast(0)
-            val fileDisplay = shortenPath(file, available)
-            add(frameLine(width, listOf(
-                Segment(label, Color.Cyan),
-                Segment(fileDisplay, Color.White)
-            )))
-        }
+        val directoryPath = state.loadingDirectoryPath
+        val directoryLabel = directoryPath?.let { shortenPath(it, (innerWidth - "Directory: ".length).coerceAtLeast(0)) } ?: "--"
+        add(frameLine(width, listOf(
+            Segment("Directory: ", Color.Cyan),
+            Segment(directoryLabel, Color.White)
+        )))
     } else {
         add(frameLine(width, listOf(Segment("Preparing directory statistics...", Color.Cyan))))
+        add(frameLine(width, listOf(
+            Segment("Directory: ", Color.Cyan),
+            Segment("--", Color.White)
+        )))
     }
 
     add(frameLine(width, listOf(Segment("Collecting directory statistics...", Color.Cyan))))

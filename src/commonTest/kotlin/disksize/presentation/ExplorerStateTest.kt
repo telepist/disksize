@@ -39,6 +39,7 @@ class ExplorerStateTest {
         assertEquals(600, updated.totalSize)
         assertEquals(600, updated.childDirectoryTotalSize)
         assertEquals(0, updated.spinnerIndex)
+        assertEquals(null, updated.loadingDirectoryPath)
     }
 
     @Test
@@ -171,6 +172,7 @@ class ExplorerStateTest {
 
         val expected = LoadingProgress.fromDomain(progress)
         assertEquals(expected, updated.loadingProgress)
+        assertEquals(null, updated.loadingDirectoryPath)
     }
 
     @Test
@@ -191,6 +193,37 @@ class ExplorerStateTest {
 
         assertEquals(null, reset.loadingProgress)
         assertTrue(reset.isLoading)
+        assertEquals(null, reset.loadingDirectoryPath)
+    }
+
+    @Test
+    fun `withProgress retains latest directory`() {
+        var state = ExplorerState(currentPath = "/tmp", isLoading = true)
+        state = state.withProgress(
+            ScanProgress(
+                processedFiles = 1,
+                totalFiles = 5,
+                processedDirectories = 0,
+                totalDirectories = 2,
+                currentDirectory = "/tmp/dir",
+                currentFile = "/tmp/dir/file.txt"
+            )
+        )
+
+        assertEquals("/tmp/dir", state.loadingDirectoryPath)
+
+        state = state.withProgress(
+            ScanProgress(
+                processedFiles = 2,
+                totalFiles = 5,
+                processedDirectories = 1,
+                totalDirectories = 2,
+                currentDirectory = null,
+                currentFile = "/tmp/dir/file2.txt"
+            )
+        )
+
+        assertEquals("/tmp/dir", state.loadingDirectoryPath)
     }
 
     private fun directory(
