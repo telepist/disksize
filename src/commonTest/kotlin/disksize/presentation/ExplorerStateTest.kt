@@ -33,18 +33,18 @@ class ExplorerStateTest {
         val initial = ExplorerState(currentPath = "/tmp", selectedIndex = 2)
         val updated = initial.withScanResult(scanResult).resetSelection()
 
-        val names = updated.directories.map { it.name }
+        val names = updated.directoryItems.map { it.node.name }
         assertEquals(listOf("b", "c", "a"), names)
         assertEquals(0, updated.selectedIndex)
         assertEquals(600, updated.totalSize)
+        assertEquals(600, updated.childDirectoryTotalSize)
         assertEquals(0, updated.spinnerIndex)
     }
 
     @Test
     fun `withSelection clamps index`() {
-        val state = ExplorerState(
-            currentPath = "/tmp",
-            scanResult = ScanResult(
+        val state = ExplorerState(currentPath = "/tmp").withScanResult(
+            ScanResult(
                 rootPath = "/tmp",
                 totalSize = 300,
                 fileCount = 0,
@@ -88,15 +88,16 @@ class ExplorerStateTest {
 
         var state = ExplorerState(currentPath = "/root").withScanResult(scanResult)
         // Initially sorted by size desc (size, date, alpha)
-        assertEquals(listOf("size", "date", "alpha"), state.directories.map { it.name })
+        assertEquals(listOf("size", "date", "alpha"), state.directoryItems.map { it.node.name })
 
         state = state.withNextSortOrder()
         assertEquals(SortOrder.NAME_ASC, state.sortOrder)
-        assertEquals(listOf("alpha", "date", "size"), state.directories.map { it.name })
+        assertEquals(listOf("alpha", "date", "size"), state.directoryItems.map { it.node.name })
 
         state = state.withNextSortOrder()
         assertEquals(SortOrder.DATE_DESC, state.sortOrder)
-        assertEquals(listOf("date", "alpha", "size"), state.directories.map { it.name })
+        assertEquals(listOf("date", "alpha", "size"), state.directoryItems.map { it.node.name })
+        assertEquals(600, state.childDirectoryTotalSize)
     }
 
     @Test

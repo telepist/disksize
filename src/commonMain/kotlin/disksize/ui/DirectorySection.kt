@@ -1,7 +1,7 @@
 package disksize.ui
 
 import com.jakewharton.mosaic.ui.Color
-import disksize.domain.model.FileNode
+import disksize.presentation.DirectoryItem
 import disksize.presentation.ExplorerState
 import disksize.presentation.LoadingProgress
 import disksize.util.SizeFormatter
@@ -22,13 +22,13 @@ internal fun directorySection(state: ExplorerState, width: Int): List<FrameLine>
             val message = state.errorMessage.take(innerWidth - 2)
             lines += frameLine(width, listOf(Segment("Error: $message", Color.Red)))
         }
-        state.directories.isEmpty() -> {
+        state.directoryItems.isEmpty() -> {
             lines += frameLine(width, listOf(Segment("(no subdirectories found)", Color.Cyan)))
         }
         else -> {
-            val totalSize = state.directories.sumOf { it.totalSize() }.coerceAtLeast(1L)
-            state.directories.forEachIndexed { index, node ->
-                lines += directoryLine(width, node, totalSize, index == state.selectedIndex)
+            val totalSize = state.childDirectoryTotalSize.coerceAtLeast(1L)
+            state.directoryItems.forEachIndexed { index, item ->
+                lines += directoryLine(width, item, totalSize, index == state.selectedIndex)
             }
             if (state.warningCount > 0) {
                 lines += frameLine(width, listOf(Segment("Warnings: ${state.warningCount} item(s) skipped", Color.Yellow)))
@@ -108,12 +108,13 @@ private fun progressCountsLabel(progress: LoadingProgress): String =
         }
     }
 
-private fun directoryLine(width: Int, node: FileNode, totalParentSize: Long, isSelected: Boolean): FrameLine {
+private fun directoryLine(width: Int, item: DirectoryItem, totalParentSize: Long, isSelected: Boolean): FrameLine {
     val innerWidth = width - 2
     val selector = if (isSelected) ">" else " "
+    val node = item.node
     val nameWithType = if (node.isDirectory) "${node.name}/" else node.name
-    val size = SizeFormatter.format(node.totalSize())
-    val percentage = if (totalParentSize > 0) node.totalSize().toDouble() / totalParentSize * 100 else 0.0
+    val size = SizeFormatter.format(item.totalSize)
+    val percentage = if (totalParentSize > 0) item.totalSize.toDouble() / totalParentSize * 100 else 0.0
     val percentStr = formatPercentage(percentage)
     val sizePart = "$size (${percentStr}%)"
 
@@ -126,9 +127,9 @@ private fun directoryLine(width: Int, node: FileNode, totalParentSize: Long, isS
         else -> Color.White
     }
     val sizeColor = when {
-        node.totalSize() >= 1_000_000_000 -> Color.Red
-        node.totalSize() >= 100_000_000 -> Color.Yellow
-        node.totalSize() >= 10_000_000 -> Color.Cyan
+        item.totalSize >= 1_000_000_000 -> Color.Red
+        item.totalSize >= 100_000_000 -> Color.Yellow
+        item.totalSize >= 10_000_000 -> Color.Cyan
         else -> Color.White
     }
 

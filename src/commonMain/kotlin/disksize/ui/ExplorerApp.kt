@@ -88,17 +88,17 @@ fun DiskSizeApp(
     MainScreen(
         state = state,
         onMoveSelection = { delta ->
-            val dirs = state.directories
-            if (dirs.isEmpty()) return@MainScreen
+            val items = state.directoryItems
+            if (items.isEmpty()) return@MainScreen
             val next = state.selectedIndex + delta
-            val bounded = next.coerceIn(0, dirs.lastIndex)
+            val bounded = next.coerceIn(0, items.lastIndex)
             if (bounded != state.selectedIndex) {
                 state = state.withSelection(bounded)
             }
         },
         onOpenSelected = {
-            val dirs = state.directories
-            val selected = dirs.getOrNull(state.selectedIndex) ?: return@MainScreen
+            val selectedItem = state.directoryItems.getOrNull(state.selectedIndex) ?: return@MainScreen
+            val selected = selectedItem.node
             val currentScan = state.scanResult ?: return@MainScreen
             history = history + state.copy()
             val childErrors = currentScan.errors.filter { it.path == selected.path || it.path.startsWith("${selected.path}/") }
@@ -142,11 +142,6 @@ private fun explorerStateFromNode(
     )
     return ExplorerState(
         currentPath = node.path,
-        scanResult = scanResult,
-        isLoading = false,
-        errorMessage = null,
-        selectedIndex = 0,
-        sortOrder = previousState.sortOrder,
-        spinnerIndex = 0
-    )
+        sortOrder = previousState.sortOrder
+    ).withScanResult(scanResult)
 }
