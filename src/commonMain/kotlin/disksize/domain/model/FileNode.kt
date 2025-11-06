@@ -7,6 +7,7 @@ package disksize.domain.model
  * @property name Name of the file or directory (without path)
  * @property size Size in bytes (for directories, this is typically 0 or metadata size)
  * @property isDirectory Whether this node represents a directory
+ * @property isSymlink Whether this node is a symbolic link (not followed)
  * @property children Child nodes (files and subdirectories), empty for files
  * @property lastModified Last modification timestamp (Unix epoch milliseconds)
  */
@@ -15,6 +16,7 @@ data class FileNode(
     val name: String,
     val size: Long,
     val isDirectory: Boolean,
+    val isSymlink: Boolean = false,
     val children: List<FileNode>,
     val lastModified: Long
 ) {

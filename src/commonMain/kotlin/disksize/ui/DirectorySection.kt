@@ -188,7 +188,11 @@ private fun directoryLine(width: Int, item: BrowserItem, totalParentSize: Long, 
     val innerWidth = width - 2
     val selector = if (isSelected) ">" else " "
     val node = item.node
-    val nameWithType = if (node.isDirectory) "${node.name}/" else node.name
+    val nameWithType = when {
+        node.isSymlink -> "${node.name}@"
+        node.isDirectory -> "${node.name}/"
+        else -> node.name
+    }
     val size = SizeFormatter.format(item.totalSize)
     val percentage = if (totalParentSize > 0) item.totalSize.toDouble() / totalParentSize * 100 else 0.0
     val percentStr = formatPercentage(percentage)
@@ -225,7 +229,8 @@ private fun directoryLine(width: Int, item: BrowserItem, totalParentSize: Long, 
 private fun fileLine(width: Int, item: BrowserItem, isSelected: Boolean): FrameLine {
     val innerWidth = width - 2
     val selector = if (isSelected) ">" else " "
-    val name = item.node.name
+    val node = item.node
+    val name = if (node.isSymlink) "${node.name}@" else node.name
     val size = SizeFormatter.format(item.totalSize)
     val labelColor = if (isSelected) Color.Green else Color.White
     val sizeColor = when {

@@ -236,6 +236,7 @@ class ExplorerStateTest {
             name = name,
             size = size,
             isDirectory = true,
+            isSymlink = false,
             children = children,
             lastModified = lastModified
         )
@@ -252,6 +253,7 @@ class ExplorerStateTest {
             name = name,
             size = size,
             isDirectory = false,
+            isSymlink = false,
             children = emptyList(),
             lastModified = lastModified
         )

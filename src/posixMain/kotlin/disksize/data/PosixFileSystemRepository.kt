@@ -12,8 +12,6 @@ import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.pointed
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.toKString
-import platform.posix.S_IFDIR
-import platform.posix.S_IFMT
 import platform.posix.access
 import platform.posix.closedir
 import platform.posix.opendir
@@ -75,6 +73,15 @@ class PosixFileSystemRepository : FileSystemRepository {
 
                 try {
                     val childNode = createFileNode(childPath)
+
+                    // Skip symlinks - they are not followed and counted only by their link size
+                    if (childNode.isSymlink) {
+                        tracker.onFileProcessed(childNode.path, childNode.size)
+                        children.add(childNode)
+                        filesInDir++
+                        continue
+                    }
+
                     if (childNode.isDirectory) {
                         val sanitized = scanDirectoryRecursive(childPath, errors, tracker, isRoot = false)
                         children.add(sanitized)
@@ -115,6 +122,7 @@ class PosixFileSystemRepository : FileSystemRepository {
     override suspend fun isAccessible(path: String): Boolean = access(path, platform.posix.R_OK) == 0
 
     private fun createFileNode(path: String): FileNode = platformCreateFileNode(path)
+
 }
 
 private class AdaptiveProgressTracker(
