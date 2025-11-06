@@ -74,3 +74,8 @@ gradle.properties.local
 
 ### Claude Code ###
 .claude/
+
+### Node.js (not part of this project) ###
+node_modules/
+package.json
+package-lock.json
