@@ -13,11 +13,6 @@ internal fun statusLine(state: ExplorerState, width: Int): FrameLine {
             segments += Segment("Scanning ", Color.Cyan)
             segments += Segment(state.spinnerFrame.toString(), Color.Yellow)
             segments += Segment(" ${shortenPath(state.currentPath, innerWidth - 10)}", Color.Cyan)
-            state.loadingProgress?.takeIf { it.totalItems > 0 }?.let { progress ->
-                val percent = (progress.completionFraction * 100.0).coerceIn(0.0, 100.0)
-                val percentText = formatPercentage(percent)
-                segments += Segment(" • ${percentText}% (${progress.processedItems}/${progress.totalItems})", Color.Green)
-            }
         }
         state.errorMessage != null -> {
             segments += Segment("Error: ${state.errorMessage.take(innerWidth - 7)}", Color.Red)

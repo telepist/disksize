@@ -21,46 +21,90 @@ import platform.posix.readdir
 import platform.posix.stat
 import kotlin.Exception
 import kotlin.collections.ArrayDeque
+import kotlin.math.max
 
-/**
- * POSIX-based file system repository implementation shared by macOS and Linux targets.
- */
 @OptIn(ExperimentalForeignApi::class)
 class PosixFileSystemRepository : FileSystemRepository {
 
     override fun scanDirectory(path: String): Flow<DirectoryScanUpdate> = flow {
         val errors = mutableListOf<ScanError>()
-        val totals = countDirectoryEntries(path)
-        val tracker = ProgressTracker(
-            totalFiles = totals.files,
-            totalDirectories = totals.directories,
-            emitProgress = { progress ->
-                emit(DirectoryScanUpdate.Progress(progress))
-            }
+
+        val tracker = AdaptiveProgressTracker(
+            emitProgress = { progress -> emit(DirectoryScanUpdate.Progress(progress)) },
+            batchSize = 100,
+            minIntervalMs = 50
         )
-        val node = scanDirectoryRecursive(
-            path = path,
-            errors = errors,
-            tracker = tracker,
-            isRoot = true
-        )
-        emit(
-            DirectoryScanUpdate.Complete(
-                FileSystemRepository.DirectoryScanResult(
-                    root = node,
-                    errors = errors
-                )
-            )
-        )
+        val node = scanDirectoryRecursive(path, errors, tracker, isRoot = true)
+        tracker.onComplete()
+        emit(DirectoryScanUpdate.Complete(FileSystemRepository.DirectoryScanResult(node, errors)))
     }
 
-    override suspend fun getFileInfo(path: String): Result<FileNode> {
-        return try {
-            val node = createFileNode(path)
-            Result.success(node)
-        } catch (e: Exception) {
-            Result.failure(e)
+    private suspend fun scanDirectoryRecursive(
+        path: String,
+        errors: MutableList<ScanError>,
+        tracker: AdaptiveProgressTracker,
+        isRoot: Boolean
+    ): FileNode {
+        val baseNode = createFileNode(path)
+
+        if (!baseNode.isDirectory) {
+            tracker.onFileProcessed(baseNode.path, baseNode.size)
+            return baseNode.copy(children = emptyList())
         }
+
+        tracker.startDirectory(baseNode.path, isRoot)
+
+        val children = mutableListOf<FileNode>()
+        val dir = opendir(path)
+
+        if (dir == null) {
+            tracker.onDirectoryProcessed(baseNode.path, isRoot, filesInDir = 0, directoriesInDir = 0)
+            throw Exception("Cannot open directory: $path")
+        }
+
+        var filesInDir = 0
+        var directoriesInDir = 0
+
+        try {
+            while (true) {
+                val entry = readdir(dir) ?: break
+                val name = entry.pointed.d_name.toKString()
+                if (name == "." || name == "..") continue
+
+                val childPath = resolveChildPath(path, name)
+
+                try {
+                    val childNode = createFileNode(childPath)
+                    if (childNode.isDirectory) {
+                        val sanitized = scanDirectoryRecursive(childPath, errors, tracker, isRoot = false)
+                        children.add(sanitized)
+                        directoriesInDir++
+                    } else {
+                        tracker.onFileProcessed(childNode.path, childNode.size)
+                        children.add(childNode)
+                        filesInDir++
+                    }
+                } catch (e: Exception) {
+                    errors += ScanError(
+                        path = childPath,
+                        message = e.message ?: "Unable to access $childPath",
+                        type = classifyError(e)
+                    )
+                    continue
+                }
+            }
+        } finally {
+            closedir(dir)
+        }
+
+        tracker.onDirectoryProcessed(baseNode.path, isRoot, filesInDir, directoriesInDir)
+        return baseNode.copy(children = children)
+    }
+
+    override suspend fun getFileInfo(path: String): Result<FileNode> = try {
+        Result.success(createFileNode(path))
+    } catch (e: Exception) {
+        Result.failure(e)
     }
 
     override suspend fun exists(path: String): Boolean = memScoped {
@@ -68,164 +112,84 @@ class PosixFileSystemRepository : FileSystemRepository {
         stat(path, statBuf.ptr) == 0
     }
 
-    override suspend fun isAccessible(path: String): Boolean {
-        return access(path, platform.posix.R_OK) == 0
-    }
-
-    private suspend fun scanDirectoryRecursive(
-        path: String,
-        errors: MutableList<ScanError>,
-        tracker: ProgressTracker,
-        isRoot: Boolean
-    ): FileNode {
-        val node = createFileNode(path)
-
-        if (node.isDirectory) {
-            if (isRoot) {
-                tracker.onRootEntered(node.path)
-            } else {
-                tracker.onDirectoryProcessed(node.path)
-            }
-
-            val children = mutableListOf<FileNode>()
-            val dir = opendir(path) ?: throw Exception("Cannot open directory: $path")
-
-            try {
-                while (true) {
-                    val entry = readdir(dir) ?: break
-                    val name = entry.pointed.d_name.toKString()
-
-                    if (name == "." || name == "..") continue
-
-                    val childPath = resolveChildPath(path, name)
-
-                    try {
-                        val child = scanDirectoryRecursive(
-                            path = childPath,
-                            errors = errors,
-                            tracker = tracker,
-                            isRoot = false
-                        )
-                        children.add(child)
-                    } catch (e: Exception) {
-                        errors += ScanError(
-                            path = childPath,
-                            message = e.message ?: "Unable to access $childPath",
-                            type = classifyError(e)
-                        )
-                        continue
-                    }
-                }
-            } finally {
-                closedir(dir)
-            }
-
-            return node.copy(children = children)
-        } else {
-            tracker.onFileProcessed(node.path)
-            return node
-        }
-    }
-
-    @OptIn(ExperimentalForeignApi::class)
-    private fun countDirectoryEntries(path: String): DirectoryTotals {
-        val rootNode = createFileNode(path)
-        if (!rootNode.isDirectory) {
-            return DirectoryTotals(files = 0, directories = 0)
-        }
-
-        var fileCount = 0
-        var directoryCount = 0
-        val stack = ArrayDeque<Pair<String, Boolean>>()
-        stack.add(path to true)
-
-        while (stack.isNotEmpty()) {
-            val (currentPath, isRoot) = stack.removeLast()
-            val dir = opendir(currentPath)
-
-            if (dir == null) {
-                if (isRoot) {
-                    throw Exception("Cannot open directory: $currentPath")
-                } else {
-                    continue
-                }
-            }
-
-            try {
-                while (true) {
-                    val entry = readdir(dir) ?: break
-                    val name = entry.pointed.d_name.toKString()
-                    if (name == "." || name == "..") continue
-
-                    val childPath = resolveChildPath(currentPath, name)
-                    val childNode = try {
-                        createFileNode(childPath)
-                    } catch (_: Exception) {
-                        continue
-                    }
-
-                    if (childNode.isDirectory) {
-                        directoryCount++
-                        stack.add(childPath to false)
-                    } else {
-                        fileCount++
-                    }
-                }
-            } finally {
-                closedir(dir)
-            }
-        }
-
-        return DirectoryTotals(files = fileCount, directories = directoryCount)
-    }
+    override suspend fun isAccessible(path: String): Boolean = access(path, platform.posix.R_OK) == 0
 
     private fun createFileNode(path: String): FileNode = platformCreateFileNode(path)
 }
 
-private data class DirectoryTotals(
-    val files: Int,
-    val directories: Int
-)
-
-private class ProgressTracker(
-    private val totalFiles: Int,
-    private val totalDirectories: Int,
-    private val emitProgress: suspend (ScanProgress) -> Unit
+private class AdaptiveProgressTracker(
+    private val emitProgress: suspend (ScanProgress) -> Unit,
+    private val batchSize: Int = 100,
+    private val minIntervalMs: Long = 50
 ) {
-    private var processedFiles: Int = 0
-    private var processedDirectories: Int = 0
-    private var currentDirectory: String? = null
-    private var currentFile: String? = null
+    private val startTime = kotlin.time.TimeSource.Monotonic.markNow()
+
+    private var processedFiles = 0
+    private var processedDirectories = 0
+    private var scannedBytes = 0L
+
+    private var filesProcessedSinceLastEmit = 0
+    private var lastEmitTime = 0L
+
+    private var currentPath: String? = null
+
+    suspend fun startDirectory(path: String, isRoot: Boolean) {
+        currentPath = path
+        emitIfBatchReady()
+    }
+
+    suspend fun onFileProcessed(path: String, size: Long) {
+        processedFiles++
+        scannedBytes += size
+        filesProcessedSinceLastEmit++
+        currentPath = path
+        emitIfBatchReady()
+    }
+
+    suspend fun onDirectoryProcessed(
+        path: String,
+        isRoot: Boolean,
+        filesInDir: Int,
+        directoriesInDir: Int
+    ) {
+        if (!isRoot) {
+            processedDirectories++
+        }
+        currentPath = path
+        emitIfBatchReady()
+    }
+
+    private suspend fun emitIfBatchReady() {
+        val now = startTime.elapsedNow().inWholeMilliseconds
+        val timeSinceEmit = now - lastEmitTime
+
+        if (filesProcessedSinceLastEmit >= batchSize ||
+            timeSinceEmit >= minIntervalMs) {
+            emit()
+            filesProcessedSinceLastEmit = 0
+            lastEmitTime = now
+        }
+    }
 
     private suspend fun emit() {
-        emitProgress(
-            ScanProgress(
-                processedFiles = processedFiles,
-                totalFiles = totalFiles,
-                processedDirectories = processedDirectories,
-                totalDirectories = totalDirectories,
-                currentDirectory = currentDirectory,
-                currentFile = currentFile
-            )
-        )
+        val elapsed = startTime.elapsedNow().inWholeMilliseconds
+        val bytesPerSecond = if (elapsed > 0) {
+            (scannedBytes * 1000) / elapsed
+        } else {
+            0L
+        }
+
+        emitProgress(ScanProgress(
+            processedFiles = processedFiles,
+            processedDirectories = processedDirectories,
+            scannedBytes = scannedBytes,
+            bytesPerSecond = bytesPerSecond,
+            currentDirectory = currentPath
+        ))
     }
 
-    suspend fun onRootEntered(path: String) {
-        currentDirectory = path
-        currentFile = null
-        emit()
-    }
-
-    suspend fun onDirectoryProcessed(path: String) {
-        processedDirectories++
-        currentDirectory = path
-        currentFile = null
-        emit()
-    }
-
-    suspend fun onFileProcessed(path: String) {
-        processedFiles++
-        currentFile = path
+    suspend fun onComplete() {
+        // Force final emit with current stats
         emit()
     }
 }

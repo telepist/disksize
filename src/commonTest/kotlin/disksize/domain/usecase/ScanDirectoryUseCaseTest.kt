@@ -170,10 +170,8 @@ class ScanDirectoryUseCaseTest {
         val progressUpdates = emissions.filterIsInstance<ScanStatus.Progress>().map { it.value }
         assertTrue(progressUpdates.isNotEmpty())
         val final = progressUpdates.last()
-        assertEquals(1, final.totalDirectories)
-        assertEquals(2, final.totalFiles)
-        assertEquals(final.totalDirectories, final.processedDirectories)
-        assertEquals(final.totalFiles, final.processedFiles)
+        assertEquals(1, final.processedDirectories)
+        assertEquals(2, final.processedFiles)
         assertTrue(emissions.any { it is ScanStatus.Completed })
     }
 }

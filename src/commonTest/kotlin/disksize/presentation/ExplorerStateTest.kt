@@ -163,9 +163,9 @@ class ExplorerStateTest {
         val base = ExplorerState(currentPath = "/tmp", isLoading = true)
         val progress = ScanProgress(
             processedFiles = 3,
-            totalFiles = 10,
             processedDirectories = 2,
-            totalDirectories = 5
+            scannedBytes = 1024,
+            bytesPerSecond = 512
         )
 
         val updated = base.withProgress(progress)
@@ -179,9 +179,9 @@ class ExplorerStateTest {
     fun `withLoading resets previous progress`() {
         val progress = LoadingProgress(
             processedFiles = 1,
-            totalFiles = 5,
             processedDirectories = 1,
-            totalDirectories = 3
+            scannedBytes = 1024,
+            bytesPerSecond = 512
         )
         val state = ExplorerState(
             currentPath = "/tmp",
@@ -202,11 +202,10 @@ class ExplorerStateTest {
         state = state.withProgress(
             ScanProgress(
                 processedFiles = 1,
-                totalFiles = 5,
                 processedDirectories = 0,
-                totalDirectories = 2,
-                currentDirectory = "/tmp/dir",
-                currentFile = "/tmp/dir/file.txt"
+                scannedBytes = 1024,
+                bytesPerSecond = 512,
+                currentDirectory = "/tmp/dir"
             )
         )
 
@@ -215,11 +214,10 @@ class ExplorerStateTest {
         state = state.withProgress(
             ScanProgress(
                 processedFiles = 2,
-                totalFiles = 5,
                 processedDirectories = 1,
-                totalDirectories = 2,
-                currentDirectory = null,
-                currentFile = "/tmp/dir/file2.txt"
+                scannedBytes = 2048,
+                bytesPerSecond = 512,
+                currentDirectory = null
             )
         )
 

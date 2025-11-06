@@ -150,56 +150,39 @@ private fun loadingLines(
 
     val progress = state.loadingProgress
     if (progress != null) {
-        if (progress.totalItems > 0) {
-            val percent = (progress.completionFraction * 100.0).coerceIn(0.0, 100.0)
-            val percentText = formatPercentage(percent)
-            val statusText = " ${progress.processedItems}/${progress.totalItems} (${percentText}%)"
-            val label = "Progress: "
-            val availableForBar = (innerWidth - label.length - statusText.length).coerceAtLeast(0)
-            val progressSegments = mutableListOf<Segment>()
-            progressSegments += Segment(label, Color.Cyan)
-            if (availableForBar >= 6) {
-                progressSegments += determinateProgressSegment(progress.completionFraction, availableForBar)
-                progressSegments += Segment(statusText, Color.Green)
-            } else {
-                progressSegments += Segment(statusText.trim(), Color.Green)
-            }
-            add(frameLine(width, progressSegments))
+        // Show scan stats
+        add(frameLine(width, listOf(
+            Segment("Files: ", Color.Cyan),
+            Segment(formatCount(progress.processedFiles), Color.White),
+            Segment("  Dirs: ", Color.Cyan),
+            Segment(formatCount(progress.processedDirectories), Color.White),
+            Segment("  Size: ", Color.Cyan),
+            Segment(SizeFormatter.format(progress.scannedBytes), Color.Green)
+        )))
+
+        // Show throughput if available
+        if (progress.bytesPerSecond > 0) {
+            add(frameLine(width, listOf(
+                Segment("Rate: ", Color.Cyan),
+                Segment("${SizeFormatter.format(progress.bytesPerSecond)}/s", Color.Yellow)
+            )))
         }
-        add(frameLine(width, listOf(Segment(progressCountsLabel(progress), Color.Cyan))))
-        val directoryPath = state.loadingDirectoryPath
-        val directoryLabel = directoryPath?.let { shortenPath(it, (innerWidth - "Directory: ".length).coerceAtLeast(0)) } ?: "--"
-        add(frameLine(width, listOf(
-            Segment("Directory: ", Color.Cyan),
-            Segment(directoryLabel, Color.White)
-        )))
+
+        // Show current directory being scanned
+        val directoryPath = state.loadingDirectoryPath ?: progress.currentDirectory
+        if (directoryPath != null) {
+            val directoryLabel = shortenPath(directoryPath, (innerWidth - "Current: ".length).coerceAtLeast(0))
+            add(frameLine(width, listOf(
+                Segment("Current: ", Color.Cyan),
+                Segment(directoryLabel, Color.White)
+            )))
+        }
     } else {
-        add(frameLine(width, listOf(Segment("Preparing directory statistics...", Color.Cyan))))
-        add(frameLine(width, listOf(
-            Segment("Directory: ", Color.Cyan),
-            Segment("--", Color.White)
-        )))
+        add(frameLine(width, listOf(Segment("Starting scan...", Color.Cyan))))
     }
 
-    add(frameLine(width, listOf(Segment("Collecting directory statistics...", Color.Cyan))))
     return lines
 }
-
-private fun progressCountsLabel(progress: LoadingProgress): String =
-    buildString {
-        append("Files ")
-        if (progress.totalFiles > 0) {
-            append("${progress.processedFiles}/${progress.totalFiles}")
-        } else {
-            append(progress.processedFiles)
-        }
-        append(" • Directories ")
-        if (progress.totalDirectories > 0) {
-            append("${progress.processedDirectories}/${progress.totalDirectories}")
-        } else {
-            append(progress.processedDirectories)
-        }
-    }
 
 private fun directoryLine(width: Int, item: BrowserItem, totalParentSize: Long, isSelected: Boolean): FrameLine {
     val innerWidth = width - 2
@@ -279,3 +262,9 @@ private fun usageBarSegment(width: Int, percentage: Double, highlight: Boolean):
 
 private fun indicatorLine(width: Int, message: String): FrameLine =
     frameLine(width, listOf(Segment(message, Color.Cyan)))
+
+private fun formatCount(count: Int): String = when {
+    count >= 1_000_000 -> "${(count / 100_000) / 10.0}M"
+    count >= 1_000 -> "${(count / 100) / 10.0}K"
+    else -> count.toString()
+}

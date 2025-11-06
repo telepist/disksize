@@ -181,9 +181,7 @@ class FakeFileSystemRepositoryTest {
         assertTrue(emissions.any { it is DirectoryScanUpdate.Complete })
         assertTrue(updates.isNotEmpty())
         val final = updates.last()
-        assertEquals(2, final.totalFiles)
-        assertEquals(1, final.totalDirectories)
-        assertEquals(final.totalFiles, final.processedFiles)
-        assertEquals(final.totalDirectories, final.processedDirectories)
+        assertEquals(2, final.processedFiles)
+        assertEquals(1, final.processedDirectories)
     }
 }

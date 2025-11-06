@@ -106,6 +106,8 @@ interface FileSystemRepository {
     suspend fun exists(path: String): Boolean
     suspend fun isAccessible(path: String): Boolean
 }
+
+`scanDirectory` streams indeterminate progress updates during the scan. Progress reports include files scanned, directories scanned, total bytes, and throughput (bytes/sec). This approach avoids the complexity and inaccuracy of pre-scan estimation while providing meaningful real-time feedback.
 ```
 
 #### Platform-Specific Implementation

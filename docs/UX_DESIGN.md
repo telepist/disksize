@@ -168,20 +168,16 @@ Always use 1024-based units (binary), show one decimal place for GB/TB.
 ## Progress Indication
 
 ### Scanning Progress
+Progress is indeterminate - we show actual statistics as the scan proceeds without estimating completion:
 ```
 Scanning | /Users/username/Documents/Projects
-Progress: [██████████░░░░░░░░░░░░] 48.2% (142/295)
-Files 120/210 • Directories 22/85
-Directory: /Users/username/Documents/Projects/app
-File: /Users/username/Documents/Projects/app/src/Main.kt
+
+Files: 1,234  Dirs: 42  Size: 2.4 GB
+Rate: 125 MB/s
+Current: /Users/username/Documents/Projects/node_modules
 ```
 
-### Indeterminate Progress
-For unknown duration:
-```
-Scanning / /Users/username/Documents/Projects
-Preparing directory statistics...
-```
+This approach provides honest, real-time feedback without the complexity and inaccuracy of pre-scan estimation or progress bar heuristics.
 
 ## Accessibility Considerations
 - High contrast color scheme option (future)
