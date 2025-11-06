@@ -17,7 +17,9 @@ class FrameTextTest {
     @Test
     fun `shortenPath truncates with ellipsis when exceeding limit`() {
         val result = shortenPath("/Users/example/Documents/projects", 10)
-        assertEquals("...rojects", result)
+        // Middle ellipsis: shows beginning and end
+        // Prefix: 3 chars "/Us", Suffix: 4 chars "ects"
+        assertEquals("/Us...ects", result)
     }
 
     @Test
