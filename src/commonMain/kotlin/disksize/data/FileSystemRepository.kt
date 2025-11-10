@@ -46,6 +46,20 @@ interface FileSystemRepository {
      * @return true if the path can be accessed, false otherwise
      */
     suspend fun isAccessible(path: String): Boolean
+
+    /**
+     * Delete a file or directory.
+     * For directories, this will recursively delete all contents.
+     *
+     * @param path Absolute path to the file or directory to delete
+     * @return Result containing the number of items deleted and bytes freed, or an error
+     */
+    suspend fun delete(path: String): Result<DeletionStats>
+
+    data class DeletionStats(
+        val itemsDeleted: Int,
+        val bytesFreed: Long
+    )
 }
 
 sealed interface DirectoryScanUpdate {

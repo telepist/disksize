@@ -33,6 +33,6 @@ internal fun statusLine(state: ExplorerState, width: Int): FrameLine {
         }
         else -> segments += Segment("Idle", Color.Cyan)
     }
-    segments += Segment("  q: Quit", Color.Yellow)
+    segments += Segment("  Del: Delete  q: Quit", Color.Yellow)
     return frameLine(width, segments)
 }

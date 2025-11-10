@@ -20,6 +20,9 @@ fun MainScreen(
     onOpenSelected: () -> Unit,
     onNavigateUp: () -> Unit,
     onCycleSort: () -> Unit,
+    onRequestDelete: () -> Unit,
+    onConfirmDelete: () -> Unit,
+    onCancelDelete: () -> Unit,
     onQuit: () -> Unit
 ) {
     val terminalState = LocalTerminalState.current
@@ -34,10 +37,14 @@ fun MainScreen(
         modifier = Modifier.onKeyEvent { event ->
             handleKey(
                 event = event,
+                state = state,
                 moveSelection = onMoveSelection,
                 openSelected = onOpenSelected,
                 navigateUp = onNavigateUp,
                 cycleSort = onCycleSort,
+                requestDelete = onRequestDelete,
+                confirmDelete = onConfirmDelete,
+                cancelDelete = onCancelDelete,
                 quit = onQuit
             )
         }
@@ -48,18 +55,33 @@ fun MainScreen(
 
 private fun handleKey(
     event: KeyEvent,
+    state: ExplorerState,
     moveSelection: (Int) -> Unit,
     openSelected: () -> Unit,
     navigateUp: () -> Unit,
     cycleSort: () -> Unit,
+    requestDelete: () -> Unit,
+    confirmDelete: () -> Unit,
+    cancelDelete: () -> Unit,
     quit: () -> Unit
 ): Boolean {
+    // If confirmation dialog is showing, only handle y/n/Escape
+    if (state.confirmDeleteItem != null) {
+        return when (event.key) {
+            "y", "Y" -> { confirmDelete(); true }
+            "n", "N", "Escape" -> { cancelDelete(); true }
+            else -> false
+        }
+    }
+
+    // Normal navigation and operations
     return when (event.key) {
         "ArrowDown", "j" -> { moveSelection(1); true }
         "ArrowUp", "k" -> { moveSelection(-1); true }
         "Enter", "ArrowRight", "l" -> { openSelected(); true }
         "Backspace", "ArrowLeft", "h" -> { navigateUp(); true }
         "s", "S" -> { cycleSort(); true }
+        "Delete" -> { requestDelete(); true }
         "q", "Q" -> { quit(); true }
         else -> false
     }

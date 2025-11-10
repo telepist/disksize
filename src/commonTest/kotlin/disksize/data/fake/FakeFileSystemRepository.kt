@@ -55,6 +55,37 @@ class FakeFileSystemRepository : FileSystemRepository {
 
     override suspend fun isAccessible(path: String): Boolean = path !in inaccessiblePaths && exists(path)
 
+    override suspend fun delete(path: String): Result<FileSystemRepository.DeletionStats> {
+        val node = files[path] ?: return Result.failure(Exception("File not found: $path"))
+        if (path in inaccessiblePaths) return Result.failure(Exception("Permission denied: $path"))
+
+        val itemsDeleted = countItems(node)
+        val bytesFreed = node.totalSize()
+
+        // Remove the node and all its children from the files map
+        removeNode(node)
+
+        return Result.success(FileSystemRepository.DeletionStats(
+            itemsDeleted = itemsDeleted,
+            bytesFreed = bytesFreed
+        ))
+    }
+
+    private fun countItems(node: FileNode): Int {
+        return if (node.isDirectory) {
+            1 + node.children.sumOf { countItems(it) }
+        } else {
+            1
+        }
+    }
+
+    private fun removeNode(node: FileNode) {
+        files.remove(node.path)
+        if (node.isDirectory) {
+            node.children.forEach { removeNode(it) }
+        }
+    }
+
     private suspend fun traverseAndSanitize(
         node: FileNode,
         tracker: AdaptiveProgressTracker,

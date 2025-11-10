@@ -18,7 +18,8 @@ data class ExplorerState(
     val loadingProgress: LoadingProgress? = null,
     val browserItems: List<BrowserItem> = emptyList(),
     val childDirectoryTotalSize: Long = 0L,
-    val loadingDirectoryPath: String? = null
+    val loadingDirectoryPath: String? = null,
+    val confirmDeleteItem: BrowserItem? = null
 ) {
     val spinnerFrame: Char
         get() = SPINNER_FRAMES[spinnerIndex % SPINNER_FRAMES.size]
@@ -116,6 +117,66 @@ fun ExplorerState.withProgress(progress: ScanProgress): ExplorerState {
         loadingProgress = updatedProgress,
         loadingDirectoryPath = directoryPath
     )
+}
+
+fun ExplorerState.withConfirmDelete(item: BrowserItem): ExplorerState {
+    return copy(confirmDeleteItem = item)
+}
+
+fun ExplorerState.cancelConfirmDelete(): ExplorerState {
+    return copy(confirmDeleteItem = null)
+}
+
+fun ExplorerState.withItemDeleted(deletedPath: String): ExplorerState {
+    // Update the scan result to remove the deleted node from the tree
+    val updatedScanResult = scanResult?.let { result ->
+        val updatedRoot = removeNodeFromTree(result.rootNode, deletedPath)
+        result.copy(
+            rootNode = updatedRoot,
+            totalSize = updatedRoot.totalSize(),
+            fileCount = updatedRoot.fileCount(),
+            directoryCount = updatedRoot.directoryCount()
+        )
+    }
+
+    // Rebuild browser items from the updated tree so they reference the new nodes
+    val updatedItems = updatedScanResult?.let { result ->
+        buildBrowserItems(result.rootNode, sortOrder)
+    } ?: emptyList()
+
+    val totalChildSize = updatedItems.filter { it.kind == BrowserItemKind.DIRECTORY }.sumOf(BrowserItem::totalSize)
+
+    // Adjust selected index if needed
+    val newIndex = if (updatedItems.isEmpty()) {
+        0
+    } else {
+        selectedIndex.coerceIn(0, updatedItems.lastIndex)
+    }
+
+    return copy(
+        scanResult = updatedScanResult,
+        browserItems = updatedItems,
+        childDirectoryTotalSize = totalChildSize,
+        selectedIndex = newIndex,
+        confirmDeleteItem = null
+    )
+}
+
+private fun removeNodeFromTree(node: FileNode, pathToRemove: String): FileNode {
+    // If this is the node to remove, return it as empty (shouldn't happen at root)
+    if (node.path == pathToRemove) {
+        return node
+    }
+
+    // If this is a directory, filter out the deleted child
+    if (node.isDirectory) {
+        val updatedChildren = node.children
+            .filterNot { it.path == pathToRemove }
+            .map { removeNodeFromTree(it, pathToRemove) }
+        return node.copy(children = updatedChildren)
+    }
+
+    return node
 }
 
 data class BrowserItem(

@@ -2,6 +2,7 @@ package disksize
 
 import com.jakewharton.mosaic.runMosaic
 import disksize.data.PosixFileSystemRepository
+import disksize.domain.usecase.DeleteFileUseCase
 import disksize.domain.usecase.ScanDirectoryUseCase
 import disksize.ui.DiskSizeApp
 import kotlinx.cinterop.ByteVar
@@ -27,11 +28,13 @@ fun main(args: Array<String>) {
     runBlocking {
         val repository = PosixFileSystemRepository()
         val scanUseCase = ScanDirectoryUseCase(repository)
+        val deleteUseCase = DeleteFileUseCase(repository)
 
         runMosaic {
             DiskSizeApp(
                 initialPath = targetPath,
-                scanDirectoryUseCase = scanUseCase
+                scanDirectoryUseCase = scanUseCase,
+                deleteFileUseCase = deleteUseCase
             )
         }
     }

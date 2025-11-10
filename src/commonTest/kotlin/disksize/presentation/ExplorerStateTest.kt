@@ -224,6 +224,195 @@ class ExplorerStateTest {
         assertEquals("/tmp/dir", state.loadingDirectoryPath)
     }
 
+    @Test
+    fun `withItemDeleted removes file from browser items`() {
+        val scanResult = ScanResult(
+            rootPath = "/tmp",
+            totalSize = 300,
+            fileCount = 2,
+            directoryCount = 1,
+            rootNode = directory(
+                path = "/tmp",
+                name = "tmp",
+                children = listOf(
+                    directory("/tmp/dir", "dir", size = 100),
+                    file("/tmp/file1.txt", "file1.txt", size = 100),
+                    file("/tmp/file2.txt", "file2.txt", size = 100)
+                )
+            ),
+            scanDurationMs = 0,
+            errors = emptyList()
+        )
+
+        val initial = ExplorerState(currentPath = "/tmp").withScanResult(scanResult)
+        assertEquals(3, initial.browserItems.size)
+
+        val updated = initial.withItemDeleted("/tmp/file1.txt")
+
+        assertEquals(2, updated.browserItems.size)
+        assertEquals(listOf("dir", "file2.txt"), updated.browserItems.map { it.node.name })
+        assertEquals(200, updated.scanResult!!.totalSize)
+        assertEquals(1, updated.scanResult!!.fileCount)
+    }
+
+    @Test
+    fun `withItemDeleted removes directory from browser items`() {
+        val scanResult = ScanResult(
+            rootPath = "/tmp",
+            totalSize = 300,
+            fileCount = 0,
+            directoryCount = 3,
+            rootNode = directory(
+                path = "/tmp",
+                name = "tmp",
+                children = listOf(
+                    directory("/tmp/a", "a", size = 100),
+                    directory("/tmp/b", "b", size = 100),
+                    directory("/tmp/c", "c", size = 100)
+                )
+            ),
+            scanDurationMs = 0,
+            errors = emptyList()
+        )
+
+        val initial = ExplorerState(currentPath = "/tmp").withScanResult(scanResult)
+        assertEquals(3, initial.browserItems.size)
+
+        val updated = initial.withItemDeleted("/tmp/b")
+
+        assertEquals(2, updated.browserItems.size)
+        assertEquals(listOf("a", "c"), updated.browserItems.map { it.node.name })
+        assertEquals(200, updated.scanResult!!.totalSize)
+        assertEquals(2, updated.scanResult!!.directoryCount)
+        assertEquals(200, updated.childDirectoryTotalSize)
+    }
+
+    @Test
+    fun `withItemDeleted updates nested tree structure`() {
+        // Create a nested structure: /tmp/parent/child/grandchild.txt
+        val grandchild = file("/tmp/parent/child/grandchild.txt", "grandchild.txt", size = 50)
+        val child = directory(
+            path = "/tmp/parent/child",
+            name = "child",
+            children = listOf(grandchild),
+            size = 0
+        )
+        val parent = directory(
+            path = "/tmp/parent",
+            name = "parent",
+            children = listOf(child),
+            size = 0
+        )
+        val scanResult = ScanResult(
+            rootPath = "/tmp",
+            totalSize = 50,
+            fileCount = 1,
+            directoryCount = 2,
+            rootNode = directory(
+                path = "/tmp",
+                name = "tmp",
+                children = listOf(parent)
+            ),
+            scanDurationMs = 0,
+            errors = emptyList()
+        )
+
+        val initial = ExplorerState(currentPath = "/tmp").withScanResult(scanResult)
+        val updated = initial.withItemDeleted("/tmp/parent/child/grandchild.txt")
+
+        // Verify the file is removed from the nested structure
+        val updatedParent = updated.scanResult!!.rootNode.children.first()
+        val updatedChild = updatedParent.children.first()
+        assertEquals(0, updatedChild.children.size)
+        assertEquals(0, updated.scanResult!!.totalSize)
+        assertEquals(0, updated.scanResult!!.fileCount)
+    }
+
+    @Test
+    fun `withItemDeleted ensures navigating into subdirectory shows updated tree`() {
+        // Create a structure where we delete a file deep in the tree
+        val fileToDelete = file("/tmp/parent/child/delete-me.txt", "delete-me.txt", size = 100)
+        val fileToKeep = file("/tmp/parent/child/keep-me.txt", "keep-me.txt", size = 50)
+        val child = directory(
+            path = "/tmp/parent/child",
+            name = "child",
+            children = listOf(fileToDelete, fileToKeep),
+            size = 0
+        )
+        val parent = directory(
+            path = "/tmp/parent",
+            name = "parent",
+            children = listOf(child),
+            size = 0
+        )
+        val scanResult = ScanResult(
+            rootPath = "/tmp",
+            totalSize = 150,
+            fileCount = 2,
+            directoryCount = 2,
+            rootNode = directory(
+                path = "/tmp",
+                name = "tmp",
+                children = listOf(parent)
+            ),
+            scanDurationMs = 0,
+            errors = emptyList()
+        )
+
+        val initial = ExplorerState(currentPath = "/tmp").withScanResult(scanResult)
+        val afterDelete = initial.withItemDeleted("/tmp/parent/child/delete-me.txt")
+
+        // Get the parent directory node from the updated tree
+        val updatedParent = afterDelete.browserItems.first().node
+
+        // Verify that if we navigate into parent, it has the updated child
+        val updatedChild = updatedParent.children.first()
+        assertEquals(1, updatedChild.children.size)
+        assertEquals("keep-me.txt", updatedChild.children.first().name)
+
+        // Verify the deleted file is not in the tree
+        val allPaths = collectAllPaths(afterDelete.scanResult!!.rootNode)
+        assertFalse(allPaths.contains("/tmp/parent/child/delete-me.txt"))
+        assertTrue(allPaths.contains("/tmp/parent/child/keep-me.txt"))
+    }
+
+    @Test
+    fun `withItemDeleted adjusts selected index when last item is deleted`() {
+        val scanResult = ScanResult(
+            rootPath = "/tmp",
+            totalSize = 200,
+            fileCount = 0,
+            directoryCount = 2,
+            rootNode = directory(
+                path = "/tmp",
+                name = "tmp",
+                children = listOf(
+                    directory("/tmp/a", "a", size = 100),
+                    directory("/tmp/b", "b", size = 100)
+                )
+            ),
+            scanDurationMs = 0,
+            errors = emptyList()
+        )
+
+        val initial = ExplorerState(currentPath = "/tmp", selectedIndex = 1)
+            .withScanResult(scanResult)
+            .withSelection(1)
+
+        val updated = initial.withItemDeleted("/tmp/b")
+
+        assertEquals(1, updated.browserItems.size)
+        assertEquals(0, updated.selectedIndex) // Should clamp to last valid index
+    }
+
+    private fun collectAllPaths(node: FileNode): Set<String> {
+        val paths = mutableSetOf(node.path)
+        for (child in node.children) {
+            paths.addAll(collectAllPaths(child))
+        }
+        return paths
+    }
+
     private fun directory(
         path: String,
         name: String,

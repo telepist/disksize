@@ -4,6 +4,11 @@ import com.jakewharton.mosaic.ui.Color
 import disksize.presentation.ExplorerState
 
 internal fun buildScreenLines(state: ExplorerState, width: Int, rows: Int): List<FrameLine> {
+    // If confirmation dialog is showing, render that instead
+    state.confirmDeleteItem?.let { item ->
+        return confirmationDialog(item, width, rows)
+    }
+
     val lines = mutableListOf<FrameLine>()
     lines += topBorder(width)
     lines += headerTitleLine(width)

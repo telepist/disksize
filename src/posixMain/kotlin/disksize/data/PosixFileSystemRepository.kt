@@ -16,7 +16,9 @@ import platform.posix.access
 import platform.posix.closedir
 import platform.posix.opendir
 import platform.posix.readdir
+import platform.posix.rmdir
 import platform.posix.stat
+import platform.posix.unlink
 import kotlin.Exception
 import kotlin.collections.ArrayDeque
 import kotlin.math.max
@@ -120,6 +122,78 @@ class PosixFileSystemRepository : FileSystemRepository {
     }
 
     override suspend fun isAccessible(path: String): Boolean = access(path, platform.posix.R_OK) == 0
+
+    override suspend fun delete(path: String): Result<FileSystemRepository.DeletionStats> = try {
+        // First, get the file info to know what we're deleting
+        val node = createFileNode(path)
+        val totalSize = node.totalSize()
+
+        // Perform deletion
+        val itemsDeleted = if (node.isDirectory) {
+            deleteDirectoryRecursive(path)
+        } else {
+            deleteFile(path)
+            1
+        }
+
+        Result.success(FileSystemRepository.DeletionStats(
+            itemsDeleted = itemsDeleted,
+            bytesFreed = totalSize
+        ))
+    } catch (e: Exception) {
+        Result.failure(e)
+    }
+
+    private fun deleteFile(path: String) {
+        if (unlink(path) != 0) {
+            throw Exception("Failed to delete file: $path")
+        }
+    }
+
+    private fun deleteDirectoryRecursive(path: String): Int {
+        var deletedCount = 0
+
+        // Open directory to read contents
+        val dir = opendir(path)
+        if (dir == null) {
+            throw Exception("Cannot open directory for deletion: $path")
+        }
+
+        try {
+            // Delete all children first
+            while (true) {
+                val entry = readdir(dir) ?: break
+                val name = entry.pointed.d_name.toKString()
+                if (name == "." || name == "..") continue
+
+                val childPath = resolveChildPath(path, name)
+
+                try {
+                    val childNode = createFileNode(childPath)
+                    if (childNode.isDirectory && !childNode.isSymlink) {
+                        // Recursively delete subdirectory
+                        deletedCount += deleteDirectoryRecursive(childPath)
+                    } else {
+                        // Delete file or symlink
+                        deleteFile(childPath)
+                        deletedCount++
+                    }
+                } catch (e: Exception) {
+                    // Continue with other files even if one fails
+                    throw Exception("Failed to delete child: $childPath - ${e.message}")
+                }
+            }
+        } finally {
+            closedir(dir)
+        }
+
+        // Finally, delete the directory itself
+        if (rmdir(path) != 0) {
+            throw Exception("Failed to delete directory: $path")
+        }
+
+        return deletedCount + 1  // +1 for the directory itself
+    }
 
     private fun createFileNode(path: String): FileNode = platformCreateFileNode(path)
 

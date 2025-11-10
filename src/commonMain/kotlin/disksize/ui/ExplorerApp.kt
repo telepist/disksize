@@ -7,15 +7,20 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import disksize.domain.model.DeletionResult
 import disksize.domain.model.FileNode
 import disksize.domain.model.ScanError
 import disksize.domain.model.ScanResult
 import disksize.domain.model.ScanStatus
+import disksize.domain.usecase.DeleteFileUseCase
 import disksize.domain.usecase.ScanDirectoryUseCase
 import disksize.presentation.ExplorerState
+import disksize.presentation.cancelConfirmDelete
 import disksize.presentation.resetSelection
 import disksize.presentation.tickSpinner
+import disksize.presentation.withConfirmDelete
 import disksize.presentation.withError
+import disksize.presentation.withItemDeleted
 import disksize.presentation.withLoading
 import disksize.presentation.withScanResult
 import disksize.presentation.withSelection
@@ -29,12 +34,14 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.launch
 import kotlin.system.exitProcess
 
 @Composable
 fun DiskSizeApp(
     initialPath: String,
-    scanDirectoryUseCase: ScanDirectoryUseCase
+    scanDirectoryUseCase: ScanDirectoryUseCase,
+    deleteFileUseCase: DeleteFileUseCase
 ) {
     var state by remember {
         mutableStateOf(ExplorerState(currentPath = initialPath, isLoading = true))
@@ -119,6 +126,29 @@ fun DiskSizeApp(
         },
         onCycleSort = {
             state = state.withNextSortOrder()
+        },
+        onRequestDelete = {
+            val selectedItem = state.browserItems.getOrNull(state.selectedIndex) ?: return@MainScreen
+            state = state.withConfirmDelete(selectedItem)
+        },
+        onConfirmDelete = {
+            val itemToDelete = state.confirmDeleteItem ?: return@MainScreen
+            scope.launch {
+                val result = deleteFileUseCase.delete(itemToDelete.node.path)
+                when (result) {
+                    is DeletionResult.Success -> {
+                        state = state.withItemDeleted(itemToDelete.node.path)
+                        // Update history to remove deleted item from all cached states
+                        history = history.map { it.withItemDeleted(itemToDelete.node.path) }
+                    }
+                    is DeletionResult.Failure -> {
+                        state = state.cancelConfirmDelete().withError(result.message)
+                    }
+                }
+            }
+        },
+        onCancelDelete = {
+            state = state.cancelConfirmDelete()
         },
         onQuit = {
             scope.cancel()
