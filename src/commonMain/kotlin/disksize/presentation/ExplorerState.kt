@@ -162,6 +162,64 @@ fun ExplorerState.withItemDeleted(deletedPath: String): ExplorerState {
     )
 }
 
+fun ExplorerState.withNodeUpdated(pathToUpdate: String, newNode: FileNode): ExplorerState {
+    // Update the scan result to replace the node at the given path
+    val updatedScanResult = scanResult?.let { result ->
+        if (result.rootPath == pathToUpdate) {
+            // The root itself was updated
+            result.copy(
+                rootNode = newNode,
+                totalSize = newNode.totalSize(),
+                fileCount = newNode.fileCount(),
+                directoryCount = newNode.directoryCount()
+            )
+        } else {
+            // Update a node somewhere in the tree
+            val updatedRoot = updateNodeInTree(result.rootNode, pathToUpdate, newNode)
+            result.copy(
+                rootNode = updatedRoot,
+                totalSize = updatedRoot.totalSize(),
+                fileCount = updatedRoot.fileCount(),
+                directoryCount = updatedRoot.directoryCount()
+            )
+        }
+    }
+
+    // Rebuild browser items from the updated tree so they reference the new nodes
+    val updatedItems = updatedScanResult?.let { result ->
+        buildBrowserItems(result.rootNode, sortOrder)
+    } ?: emptyList()
+
+    val totalChildSize = updatedItems.filter { it.kind == BrowserItemKind.DIRECTORY }.sumOf(BrowserItem::totalSize)
+
+    return copy(
+        scanResult = updatedScanResult,
+        browserItems = updatedItems,
+        childDirectoryTotalSize = totalChildSize
+    )
+}
+
+private fun updateNodeInTree(node: FileNode, pathToUpdate: String, newNode: FileNode): FileNode {
+    // If this is the node to update, replace it
+    if (node.path == pathToUpdate) {
+        return newNode
+    }
+
+    // If this is a directory, recursively update children
+    if (node.isDirectory) {
+        val updatedChildren = node.children.map { child ->
+            if (child.path == pathToUpdate || pathToUpdate.startsWith("${child.path}/")) {
+                updateNodeInTree(child, pathToUpdate, newNode)
+            } else {
+                child
+            }
+        }
+        return node.copy(children = updatedChildren)
+    }
+
+    return node
+}
+
 private fun removeNodeFromTree(node: FileNode, pathToRemove: String): FileNode {
     // If this is the node to remove, return it as empty (shouldn't happen at root)
     if (node.path == pathToRemove) {

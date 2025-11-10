@@ -405,6 +405,131 @@ class ExplorerStateTest {
         assertEquals(0, updated.selectedIndex) // Should clamp to last valid index
     }
 
+    @Test
+    fun `withNodeUpdated replaces node at root level`() {
+        val oldChild = file("/tmp/old.txt", "old.txt", size = 100)
+        val scanResult = ScanResult(
+            rootPath = "/tmp",
+            totalSize = 100,
+            fileCount = 1,
+            directoryCount = 1,
+            rootNode = directory(
+                path = "/tmp",
+                name = "tmp",
+                children = listOf(oldChild)
+            ),
+            scanDurationMs = 0,
+            errors = emptyList()
+        )
+
+        val initial = ExplorerState(currentPath = "/tmp").withScanResult(scanResult)
+        assertEquals(1, initial.browserItems.size)
+        assertEquals("old.txt", initial.browserItems[0].node.name)
+
+        // Simulate a refresh where the directory now has a different child
+        val newChild = file("/tmp/new.txt", "new.txt", size = 200)
+        val updatedRootNode = directory(
+            path = "/tmp",
+            name = "tmp",
+            children = listOf(newChild)
+        )
+
+        val updated = initial.withNodeUpdated("/tmp", updatedRootNode)
+
+        assertEquals(1, updated.browserItems.size)
+        assertEquals("new.txt", updated.browserItems[0].node.name)
+        assertEquals(200, updated.totalSize)
+    }
+
+    @Test
+    fun `withNodeUpdated updates nested node in tree`() {
+        val grandchild1 = file("/tmp/parent/child/file1.txt", "file1.txt", size = 50)
+        val grandchild2 = file("/tmp/parent/child/file2.txt", "file2.txt", size = 75)
+        val child = directory(
+            path = "/tmp/parent/child",
+            name = "child",
+            children = listOf(grandchild1, grandchild2)
+        )
+        val parent = directory(
+            path = "/tmp/parent",
+            name = "parent",
+            children = listOf(child)
+        )
+        val root = directory(
+            path = "/tmp",
+            name = "tmp",
+            children = listOf(parent)
+        )
+
+        val scanResult = ScanResult(
+            rootPath = "/tmp",
+            totalSize = 125,
+            fileCount = 2,
+            directoryCount = 3,
+            rootNode = root,
+            scanDurationMs = 0,
+            errors = emptyList()
+        )
+
+        val initial = ExplorerState(currentPath = "/tmp").withScanResult(scanResult)
+
+        // Simulate refreshing the child directory with new content
+        val newGrandchild = file("/tmp/parent/child/file3.txt", "file3.txt", size = 100)
+        val updatedChild = directory(
+            path = "/tmp/parent/child",
+            name = "child",
+            children = listOf(newGrandchild)
+        )
+
+        val updated = initial.withNodeUpdated("/tmp/parent/child", updatedChild)
+
+        // Navigate to the updated child to verify the change
+        val allPaths = collectAllPaths(updated.scanResult!!.rootNode)
+        assertTrue(allPaths.contains("/tmp/parent/child/file3.txt"))
+        assertFalse(allPaths.contains("/tmp/parent/child/file1.txt"))
+        assertFalse(allPaths.contains("/tmp/parent/child/file2.txt"))
+    }
+
+    @Test
+    fun `withNodeUpdated preserves browser item list structure`() {
+        val child1 = directory("/tmp/child1", "child1", size = 100)
+        val child2 = directory("/tmp/child2", "child2", size = 200)
+        val root = directory(
+            path = "/tmp",
+            name = "tmp",
+            children = listOf(child1, child2)
+        )
+
+        val scanResult = ScanResult(
+            rootPath = "/tmp",
+            totalSize = 300,
+            fileCount = 0,
+            directoryCount = 3,
+            rootNode = root,
+            scanDurationMs = 0,
+            errors = emptyList()
+        )
+
+        val initial = ExplorerState(currentPath = "/tmp")
+            .withScanResult(scanResult)
+
+        // Update root with refreshed data
+        val newChild3 = directory("/tmp/child3", "child3", size = 150)
+        val updatedRoot = directory(
+            path = "/tmp",
+            name = "tmp",
+            children = listOf(child2, newChild3) // child1 is gone, child3 is new
+        )
+
+        val updated = initial.withNodeUpdated("/tmp", updatedRoot)
+
+        // Browser items should reflect the new children
+        assertEquals(2, updated.browserItems.size)
+        assertEquals(listOf("child2", "child3"), updated.browserItems.map { it.node.name })
+        assertEquals(350, updated.totalSize)
+        assertEquals(350, updated.childDirectoryTotalSize)
+    }
+
     private fun collectAllPaths(node: FileNode): Set<String> {
         val paths = mutableSetOf(node.path)
         for (child in node.children) {

@@ -110,6 +110,7 @@ Always use 1024-based units (binary), show one decimal place for GB/TB.
 | Enter Directory | `Enter` or `→` or `l` | Navigate into selected directory |
 | Go Up One Level | `Backspace` or `←` or `h` | Navigate to parent directory |
 | Sort Toggle | `s` | Cycle sort options (Size ↓ → Name ↑ → Date ↓) |
+| Refresh | `r` | Rescan current directory and subdirectories |
 | Delete | `Delete` | Delete selected file or directory |
 | Quit | `q` | Exit application |
 

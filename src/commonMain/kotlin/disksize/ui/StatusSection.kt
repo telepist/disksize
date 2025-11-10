@@ -5,17 +5,22 @@ import disksize.presentation.BrowserItemKind
 import disksize.presentation.ExplorerState
 import disksize.util.SizeFormatter
 
+private const val KEY_HINTS = "  r: Refresh  Del: Delete  q: Quit"
+
 internal fun statusLine(state: ExplorerState, width: Int): FrameLine {
     val innerWidth = width - 2
+    val keyHintsLength = KEY_HINTS.length
+    val availableForStatus = innerWidth - keyHintsLength
+
     val segments = mutableListOf<Segment>()
     when {
         state.isLoading -> {
             segments += Segment("Scanning ", Color.Cyan)
             segments += Segment(state.spinnerFrame.toString(), Color.Yellow)
-            segments += Segment(" ${shortenPath(state.currentPath, innerWidth - 10)}", Color.Cyan)
+            segments += Segment(" ${shortenPath(state.currentPath, availableForStatus - 10)}", Color.Cyan)
         }
         state.errorMessage != null -> {
-            segments += Segment("Error: ${state.errorMessage.take(innerWidth - 7)}", Color.Red)
+            segments += Segment("Error: ${state.errorMessage.take(availableForStatus - 7)}", Color.Red)
         }
         state.scanResult != null -> {
             val seconds = state.scanDurationMs / 1000.0
@@ -26,13 +31,17 @@ internal fun statusLine(state: ExplorerState, width: Int): FrameLine {
             }
             state.selectedItem?.let { item ->
                 val size = SizeFormatter.format(item.totalSize)
-                val name = shortenPath(item.node.name, innerWidth - base.length - 25)
                 val label = if (item.kind == BrowserItemKind.DIRECTORY) "Selected" else "File"
-                segments += Segment(" • $label: $name ($size)", Color.Cyan)
+                val prefix = " • $label: "
+                val suffix = " ($size)"
+                // Calculate max length for the name to ensure key hints fit
+                val maxNameLength = (availableForStatus - base.length - prefix.length - suffix.length).coerceAtLeast(5)
+                val name = shortenPath(item.node.name, maxNameLength)
+                segments += Segment("$prefix$name$suffix", Color.Cyan)
             }
         }
         else -> segments += Segment("Idle", Color.Cyan)
     }
-    segments += Segment("  Del: Delete  q: Quit", Color.Yellow)
+    segments += Segment(KEY_HINTS, Color.Yellow)
     return frameLine(width, segments)
 }

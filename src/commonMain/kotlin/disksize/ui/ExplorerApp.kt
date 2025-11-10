@@ -22,6 +22,7 @@ import disksize.presentation.withConfirmDelete
 import disksize.presentation.withError
 import disksize.presentation.withItemDeleted
 import disksize.presentation.withLoading
+import disksize.presentation.withNodeUpdated
 import disksize.presentation.withScanResult
 import disksize.presentation.withSelection
 import disksize.presentation.withNextSortOrder
@@ -56,6 +57,8 @@ fun DiskSizeApp(
 
     LaunchedEffect(pendingScan) {
         val path = pendingScan ?: return@LaunchedEffect
+        // Detect if this is a refresh (same path) vs navigation (different path)
+        val isRefresh = (path == state.currentPath)
         state = state.withLoading(path)
         val result = try {
             scanDirectoryUseCase
@@ -68,6 +71,10 @@ fun DiskSizeApp(
                     }
                     is ScanStatus.Completed -> {
                         state = state.withScanResult(update.result).resetSelection()
+                        // Update history if this is a refresh to keep parent cache in sync
+                        if (isRefresh && history.isNotEmpty()) {
+                            history = history.map { it.withNodeUpdated(path, update.result.rootNode) }
+                        }
                     }
                 }
             }
@@ -80,7 +87,10 @@ fun DiskSizeApp(
             state = state.withError(message)
         }
         pendingScan = null
-        history = emptyList()
+        // Only clear history when navigating to a different directory, not when refreshing
+        if (!isRefresh) {
+            history = emptyList()
+        }
     }
 
     LaunchedEffect(state.isLoading, pendingScan) {
@@ -126,6 +136,11 @@ fun DiskSizeApp(
         },
         onCycleSort = {
             state = state.withNextSortOrder()
+        },
+        onRefresh = {
+            // Trigger a rescan of the current directory
+            pendingScan = state.currentPath
+            // History will be preserved and updated to reflect new scan results
         },
         onRequestDelete = {
             val selectedItem = state.browserItems.getOrNull(state.selectedIndex) ?: return@MainScreen

@@ -20,6 +20,7 @@ fun MainScreen(
     onOpenSelected: () -> Unit,
     onNavigateUp: () -> Unit,
     onCycleSort: () -> Unit,
+    onRefresh: () -> Unit,
     onRequestDelete: () -> Unit,
     onConfirmDelete: () -> Unit,
     onCancelDelete: () -> Unit,
@@ -42,6 +43,7 @@ fun MainScreen(
                 openSelected = onOpenSelected,
                 navigateUp = onNavigateUp,
                 cycleSort = onCycleSort,
+                refresh = onRefresh,
                 requestDelete = onRequestDelete,
                 confirmDelete = onConfirmDelete,
                 cancelDelete = onCancelDelete,
@@ -60,6 +62,7 @@ private fun handleKey(
     openSelected: () -> Unit,
     navigateUp: () -> Unit,
     cycleSort: () -> Unit,
+    refresh: () -> Unit,
     requestDelete: () -> Unit,
     confirmDelete: () -> Unit,
     cancelDelete: () -> Unit,
@@ -81,6 +84,7 @@ private fun handleKey(
         "Enter", "ArrowRight", "l" -> { openSelected(); true }
         "Backspace", "ArrowLeft", "h" -> { navigateUp(); true }
         "s", "S" -> { cycleSort(); true }
+        "r", "R" -> { refresh(); true }
         "Delete" -> { requestDelete(); true }
         "q", "Q" -> { quit(); true }
         else -> false

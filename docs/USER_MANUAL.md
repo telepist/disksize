@@ -107,6 +107,7 @@ DiskSize uses colors to help you quickly identify large items:
 | `Enter` or `→` or `l`     | Open the selected directory                 |
 | `Backspace` or `←` or `h` | Navigate to the parent directory            |
 | `s`                       | Cycle sort order (Size ↓ → Name ↑ → Date ↓) |
+| `r`                       | Refresh (rescan) the current directory      |
 | `Delete`                  | Delete the selected file or directory       |
 | `q`                       | Quit the application                        |
 
