@@ -99,7 +99,7 @@ DiskSize uses colors to help you quickly identify large items:
 
 ## Keyboard Controls
 
-### Interactive Navigation
+### Navigation (MVP 2 - Available Now)
 | Key                       | Action                                      |
 |---------------------------|---------------------------------------------|
 | `↑` or `k`                | Move selection up                           |
@@ -173,12 +173,9 @@ sudo disksize /var/log
 
 ### Sorting Options
 Press `s` to cycle through sort options:
-- **Size (Descending)**: Largest items first (default)
-- **Size (Ascending)**: Smallest items first
-- **Name (A-Z)**: Alphabetical order
-- **Name (Z-A)**: Reverse alphabetical
-- **Date (Newest)**: Recently modified first
-- **Date (Oldest)**: Oldest modified first
+- **Size ↓ (Descending)**: Largest items first (default)
+- **Name ↑ (Ascending)**: Alphabetical order
+- **Date ↓ (Descending)**: Recently modified first
 
 ### Filtering by Size
 Only show items larger than a certain size:
@@ -259,7 +256,7 @@ sudo disksize /Library
 A: DiskSize reports the actual file sizes (apparent size). This matches file managers but may differ from disk usage tools that report allocated blocks.
 
 **Q: Can I delete files from within DiskSize?**
-A: Not in MVP 1-3. This is a viewing/analyzing tool. Use your file manager or terminal to delete files.
+A: Yes! Press the `Delete` key on any selected file or directory. You'll be prompted to confirm before deletion (press `y` to confirm or `n`/`Escape` to cancel).
 
 **Q: Does it work on Windows?**
 A: Yes, DiskSize is cross-platform and works on Windows, macOS, and Linux.
@@ -282,14 +279,26 @@ A: No. DiskSize runs entirely locally on your machine. No data is transmitted an
 
 ## Version History
 
-### v0.1.0 (MVP 1) - Current
+### v0.2.0 (MVP 2) - Current
+- Interactive keyboard navigation with vim-style shortcuts
+- Directory hierarchy exploration
+- Multiple sort modes (size, name, date)
+- File and directory display
+- Refresh functionality
+- File deletion with confirmation
+- Intelligent caching for snappy navigation
+- Streaming progress updates
+- Proper symlink handling
+- Color-coded size indicators
+- Enhanced status bar with contextual hints
+
+### v0.1.0 (MVP 1)
 - Initial release
 - Basic directory scanning
 - Static display of subdirectories sorted by size
 - macOS support
 
 ### Planned Releases
-- v0.2.0 (MVP 2): Interactive navigation
-- v0.3.0 (MVP 3): Tree visualization, filtering
-- v0.4.0 (MVP 4): Advanced features, export
-- v1.0.0 (MVP 5): Production release, all platforms
+- v0.3.0 (MVP 3): Tree visualization, percentage bars, file type icons
+- v0.4.0 (MVP 4): Advanced features, search, filter, export
+- v1.0.0 (MVP 5): Production release, all platforms tested

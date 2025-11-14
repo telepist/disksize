@@ -36,7 +36,7 @@ Build a TreeSize-inspired Terminal User Interface (TUI) application for scanning
 - Works on macOS (primary development platform)
 - 80%+ test coverage
 
-### MVP 2: Interactive Navigation
+### MVP 2: Interactive Navigation (Complete)
 **Goal**: Navigate through directory hierarchy interactively
 
 **Features**:
@@ -45,6 +45,12 @@ Build a TreeSize-inspired Terminal User Interface (TUI) application for scanning
 - [x] Sort options (by size, name, date)
 - [x] Enhanced status bar showing aggregated totals for selection
 - [x] Color-coded size indicators
+- [x] Display both files and directories
+- [x] Refresh functionality (r key)
+- [x] File deletion with confirmation (Delete key)
+- [x] Intelligent cache preservation during navigation
+- [x] Symlink handling without following
+- [x] Streaming progress updates during scan
 
 ### MVP 3: Tree Visualization & Percentages
 **Goal**: Visual representation of space usage
@@ -110,16 +116,21 @@ disksize/
 ```
 
 ## Current Status
-- **Phase**: Preparing MVP 2 - Interactive Navigation
+- **Phase**: MVP 2 Complete - Ready for MVP 3
 - **Recent Progress**:
-  - Completed directory scanning pipeline with POSIX implementation
-  - Delivered static Mosaic TUI for summarizing scan results
-  - Added unit test coverage for domain models, use cases, and utilities
+  - ✅ Completed all MVP 2 interactive navigation features
+  - ✅ Added directory refresh with intelligent cache preservation
+  - ✅ Implemented file deletion with confirmation dialog
+  - ✅ Added streaming progress updates with Flow-based scanning
+  - ✅ Proper symlink handling without following
+  - ✅ Show both files and directories with sorting
+  - ✅ Enhanced status bar with contextual hints
 - **Next Steps**:
-  1. Introduce interactive navigation controls (arrow keys, drill down/up)
-  2. Track selection state and render highlighted rows
-  3. Add sort options and status bar updates for navigation
-  4. Handle incremental re-scan requests when navigating
+  1. Add tree visualization with indentation
+  2. Implement percentage bars in tree view
+  3. Add file type detection and icons
+  4. Create multiple view modes (tree, list, details)
+  5. Add filter by file type functionality
 
 ## Success Metrics
 - **Performance**: Scan 100GB in under 30 seconds

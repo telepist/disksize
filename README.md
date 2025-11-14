@@ -10,12 +10,17 @@ A cross-platform Terminal User Interface (TUI) disk space analyzer inspired by T
 DiskSize helps you quickly identify which directories and files are consuming the most disk space. It provides a fast, intuitive terminal interface for navigating your filesystem and understanding space usage patterns.
 
 **Features:**
-- 🚀 Fast directory scanning
+- 🚀 Fast directory scanning with real-time progress
 - 📊 Visual size representation with percentage bars
 - 🎨 Color-coded size indicators
-- ⌨️  Keyboard-driven interface
+- ⌨️  Keyboard-driven interface with vim-style shortcuts
 - 🔄 Cross-platform (macOS, Linux, Windows)
 - 📦 Single native binary, no dependencies
+- 🗂️  Interactive navigation through directory hierarchy
+- 🔄 Refresh current directory with intelligent caching
+- 🗑️  Delete files/directories with confirmation
+- 📁 View both files and directories
+- 🔀 Multiple sort modes (size, name, date)
 
 ## Quick Start
 
@@ -75,18 +80,21 @@ disksize ~/Documents
 
 ## Development Roadmap
 
-### MVP 1: Basic Directory Scanning (Current)
+### MVP 1: Basic Directory Scanning ✅
 - ✅ Command-line directory path support
 - ✅ Recursive directory scanning
 - ✅ Size calculation and statistics
 - ✅ Basic TUI display
-- 🚧 In progress...
+- ✅ Cross-platform POSIX implementation
 
-### MVP 2: Interactive Navigation
-- Keyboard navigation (arrow keys)
-- Drill down into directories
-- Sort by size, name, date
-- Status bar and color coding
+### MVP 2: Interactive Navigation ✅
+- ✅ Keyboard navigation (arrow keys, vim-style)
+- ✅ Drill down into directories
+- ✅ Sort by size, name, date
+- ✅ Status bar and color coding
+- ✅ Display files and directories
+- ✅ Refresh functionality
+- ✅ File deletion with confirmation
 
 ### MVP 3: Tree Visualization
 - Tree view with indentation
@@ -251,6 +259,6 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ---
 
-**Status:** MVP 1 in development 🚧
+**Status:** MVP 2 Complete ✅
 
-**Next milestone:** Basic directory scanning with static TUI display
+**Next milestone:** MVP 3 - Tree visualization and advanced filtering
