@@ -17,7 +17,16 @@ internal fun statusLine(state: ExplorerState, width: Int): FrameLine {
         state.isLoading -> {
             segments += Segment("Scanning ", Color.Cyan)
             segments += Segment(state.spinnerFrame.toString(), Color.Yellow)
-            segments += Segment(" ${shortenPath(state.currentPath, availableForStatus - 10)}", Color.Cyan)
+
+            // Calculate elapsed time
+            val elapsedText = state.scanStartTimeMark?.let { mark ->
+                val elapsedSeconds = mark.elapsedNow().inWholeSeconds
+                " (${elapsedSeconds}s) "
+            } ?: " "
+
+            val pathMaxLength = (availableForStatus - 10 - elapsedText.length).coerceAtLeast(10)
+            segments += Segment(elapsedText, Color.Yellow)
+            segments += Segment(shortenPath(state.currentPath, pathMaxLength), Color.Cyan)
         }
         state.errorMessage != null -> {
             segments += Segment("Error: ${state.errorMessage.take(availableForStatus - 7)}", Color.Red)

@@ -3,6 +3,7 @@ package disksize.presentation
 import disksize.domain.model.FileNode
 import disksize.domain.model.ScanProgress
 import disksize.domain.model.ScanResult
+import kotlin.time.TimeSource
 
 /**
  * UI-facing state for the directory explorer.
@@ -19,7 +20,8 @@ data class ExplorerState(
     val browserItems: List<BrowserItem> = emptyList(),
     val childDirectoryTotalSize: Long = 0L,
     val loadingDirectoryPath: String? = null,
-    val confirmDeleteItem: BrowserItem? = null
+    val confirmDeleteItem: BrowserItem? = null,
+    val scanStartTimeMark: TimeSource.Monotonic.ValueTimeMark? = null
 ) {
     val spinnerFrame: Char
         get() = SPINNER_FRAMES[spinnerIndex % SPINNER_FRAMES.size]
@@ -74,7 +76,8 @@ fun ExplorerState.withLoading(path: String): ExplorerState {
         loadingProgress = null,
         browserItems = emptyList(),
         childDirectoryTotalSize = 0L,
-        loadingDirectoryPath = null
+        loadingDirectoryPath = null,
+        scanStartTimeMark = TimeSource.Monotonic.markNow()
     )
 }
 
