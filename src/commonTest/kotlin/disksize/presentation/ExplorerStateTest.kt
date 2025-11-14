@@ -3,6 +3,7 @@ package disksize.presentation
 import disksize.domain.model.FileNode
 import disksize.domain.model.ScanProgress
 import disksize.domain.model.ScanResult
+import disksize.domain.model.createFileNode
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -545,7 +546,7 @@ class ExplorerStateTest {
         children: List<FileNode> = emptyList(),
         lastModified: Long = 0L
     ): FileNode {
-        return FileNode(
+        return createFileNode(
             path = path,
             name = name,
             size = size,
@@ -562,7 +563,7 @@ class ExplorerStateTest {
         size: Long,
         lastModified: Long = 0L
     ): FileNode {
-        return FileNode(
+        return createFileNode(
             path = path,
             name = name,
             size = size,

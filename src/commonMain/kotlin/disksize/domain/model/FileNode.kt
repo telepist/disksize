@@ -10,6 +10,9 @@ package disksize.domain.model
  * @property isSymlink Whether this node is a symbolic link (not followed)
  * @property children Child nodes (files and subdirectories), empty for files
  * @property lastModified Last modification timestamp (Unix epoch milliseconds)
+ * @property cachedTotalSize Cached total size including all children (calculated during scan)
+ * @property cachedFileCount Cached count of files including all descendants (calculated during scan)
+ * @property cachedDirectoryCount Cached count of directories in descendants (calculated during scan)
  */
 data class FileNode(
     val path: String,
@@ -18,19 +21,19 @@ data class FileNode(
     val isDirectory: Boolean,
     val isSymlink: Boolean = false,
     val children: List<FileNode>,
-    val lastModified: Long
+    val lastModified: Long,
+    val cachedTotalSize: Long = size,
+    val cachedFileCount: Int = if (isDirectory) 0 else 1,
+    val cachedDirectoryCount: Int = 0
 ) {
     /**
      * Calculate the total size of this node including all children recursively.
      * For files, returns the file size.
      * For directories, returns the sum of all contained files and subdirectories.
+     * Uses cached value calculated during scan for O(1) performance.
      */
     fun totalSize(): Long {
-        return if (isDirectory) {
-            size + children.sumOf { it.totalSize() }
-        } else {
-            size
-        }
+        return cachedTotalSize
     }
 
     /**
@@ -45,26 +48,46 @@ data class FileNode(
      * Count total number of files in this node and all children recursively.
      * For files, returns 1.
      * For directories, returns the sum of all files in children.
+     * Uses cached value calculated during scan for O(1) performance.
      */
     fun fileCount(): Int {
-        return if (isDirectory) {
-            children.sumOf { it.fileCount() }
-        } else {
-            1
-        }
+        return cachedFileCount
     }
 
     /**
      * Count total number of directories in this node's children recursively.
      * Does not count the node itself.
      * For files, returns 0.
+     * Uses cached value calculated during scan for O(1) performance.
      */
     fun directoryCount(): Int {
-        return if (isDirectory) {
-            children.count { it.isDirectory } +
-                children.filter { it.isDirectory }.sumOf { it.directoryCount() }
-        } else {
-            0
+        return cachedDirectoryCount
+    }
+
+    /**
+     * Create a copy of this node with updated children and recalculated aggregates.
+     * Use this instead of copy(children = ...) to ensure cached aggregates stay consistent.
+     */
+    fun withChildren(newChildren: List<FileNode>): FileNode {
+        // Recalculate aggregates from new children
+        var totalSize = size
+        var totalFiles = if (isDirectory) 0 else 1
+        var totalDirs = 0
+
+        for (child in newChildren) {
+            totalSize += child.cachedTotalSize
+            totalFiles += child.cachedFileCount
+            totalDirs += child.cachedDirectoryCount
+            if (child.isDirectory) {
+                totalDirs += 1
+            }
         }
+
+        return copy(
+            children = newChildren,
+            cachedTotalSize = totalSize,
+            cachedFileCount = totalFiles,
+            cachedDirectoryCount = totalDirs
+        )
     }
 }

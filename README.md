@@ -215,6 +215,23 @@ We maintain high code quality standards:
 - Clear documentation
 - Regular refactoring
 
+### Performance Testing
+
+Measure and track scanning performance:
+
+```bash
+# Run quick benchmark
+./perf-test.sh -s small -r 3
+
+# Create baseline
+./perf-test.sh -s medium -r 5 -o perf-results/baseline.txt
+
+# Compare after optimization
+./perf-test.sh -s medium -r 5 -b perf-results/baseline.txt
+```
+
+See [docs/PERFORMANCE_TESTING.md](docs/PERFORMANCE_TESTING.md) for detailed guide.
+
 ## Technology Stack
 
 - **Kotlin Multiplatform** 2.2.20 - Cross-platform development

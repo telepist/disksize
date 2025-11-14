@@ -4,6 +4,7 @@ import disksize.data.fake.FakeFileSystemRepository
 import disksize.domain.model.DeletionResult
 import disksize.domain.model.ErrorType
 import disksize.domain.model.FileNode
+import disksize.domain.model.createFileNode
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -16,7 +17,7 @@ class DeleteFileUseCaseTest {
         val repository = FakeFileSystemRepository()
         val useCase = DeleteFileUseCase(repository)
 
-        val file = FileNode(
+        val file = createFileNode(
             path = "/test/file.txt",
             name = "file.txt",
             size = 1024,
@@ -40,9 +41,9 @@ class DeleteFileUseCaseTest {
         val repository = FakeFileSystemRepository()
         val useCase = DeleteFileUseCase(repository)
 
-        val child1 = FileNode("/test/dir/file1.txt", "file1.txt", 100, false, false, emptyList(), 0L)
-        val child2 = FileNode("/test/dir/file2.txt", "file2.txt", 200, false, false, emptyList(), 0L)
-        val directory = FileNode(
+        val child1 = createFileNode("/test/dir/file1.txt", "file1.txt", 100, false, false, emptyList(), 0L)
+        val child2 = createFileNode("/test/dir/file2.txt", "file2.txt", 200, false, false, emptyList(), 0L)
+        val directory = createFileNode(
             path = "/test/dir",
             name = "dir",
             size = 0,
@@ -80,7 +81,7 @@ class DeleteFileUseCaseTest {
         val repository = FakeFileSystemRepository()
         val useCase = DeleteFileUseCase(repository)
 
-        val file = FileNode("/test/restricted.txt", "restricted.txt", 1024, false, false, emptyList(), 0L)
+        val file = createFileNode("/test/restricted.txt", "restricted.txt", 1024, false, false, emptyList(), 0L)
         repository.addFile(file)
         repository.markInaccessible("/test/restricted.txt")
 

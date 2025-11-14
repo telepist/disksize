@@ -107,7 +107,27 @@ class PosixFileSystemRepository : FileSystemRepository {
         }
 
         tracker.onDirectoryProcessed(baseNode.path, isRoot, filesInDir, directoriesInDir)
-        return baseNode.copy(children = children)
+
+        // Calculate aggregates for this directory from its children
+        var totalSize = baseNode.size
+        var totalFiles = 0
+        var totalDirs = 0
+
+        for (child in children) {
+            totalSize += child.cachedTotalSize
+            totalFiles += child.cachedFileCount
+            totalDirs += child.cachedDirectoryCount
+            if (child.isDirectory) {
+                totalDirs += 1  // Count the directory itself
+            }
+        }
+
+        return baseNode.copy(
+            children = children,
+            cachedTotalSize = totalSize,
+            cachedFileCount = totalFiles,
+            cachedDirectoryCount = totalDirs
+        )
     }
 
     override suspend fun getFileInfo(path: String): Result<FileNode> = try {

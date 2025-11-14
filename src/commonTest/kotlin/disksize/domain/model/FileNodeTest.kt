@@ -9,7 +9,7 @@ class FileNodeTest {
 
     @Test
     fun `should create file node with basic properties`() {
-        val node = FileNode(
+        val node = createFileNode(
             path = "/test/file.txt",
             name = "file.txt",
             size = 1024,
@@ -29,7 +29,7 @@ class FileNodeTest {
 
     @Test
     fun `should create directory node with children`() {
-        val child1 = FileNode(
+        val child1 = createFileNode(
             path = "/test/dir/file1.txt",
             name = "file1.txt",
             size = 100,
@@ -39,7 +39,7 @@ class FileNodeTest {
             lastModified = 0L
         )
 
-        val child2 = FileNode(
+        val child2 = createFileNode(
             path = "/test/dir/file2.txt",
             name = "file2.txt",
             size = 200,
@@ -49,7 +49,7 @@ class FileNodeTest {
             lastModified = 0L
         )
 
-        val directory = FileNode(
+        val directory = createFileNode(
             path = "/test/dir",
             name = "dir",
             size = 0,
@@ -66,22 +66,20 @@ class FileNodeTest {
 
     @Test
     fun `should calculate total size including children`() {
-        val child1 = FileNode("/test/file1.txt", "file1.txt", 100, false, false, emptyList(), 0L)
-        val child2 = FileNode("/test/file2.txt", "file2.txt", 200, false, false, emptyList(), 0L)
-        val subdir = FileNode("/test/subdir", "subdir", 0, true, false,
-            listOf(
-                FileNode("/test/subdir/file3.txt", "file3.txt", 300, false, false, emptyList(), 0L)
-            ), 0L
+        val child1 = createFileNode("/test/file1.txt", "file1.txt", 100, false)
+        val child2 = createFileNode("/test/file2.txt", "file2.txt", 200, false)
+        val subdir = createFileNode("/test/subdir", "subdir", 0, true,
+            children = listOf(
+                createFileNode("/test/subdir/file3.txt", "file3.txt", 300, false)
+            )
         )
 
-        val root = FileNode(
+        val root = createFileNode(
             path = "/test",
             name = "test",
             size = 50, // Directory's own metadata size
             isDirectory = true,
-            isSymlink = false,
-            children = listOf(child1, child2, subdir),
-            lastModified = 0L
+            children = listOf(child1, child2, subdir)
         )
 
         val totalSize = root.totalSize()
@@ -92,24 +90,23 @@ class FileNodeTest {
 
     @Test
     fun `should return size for file without children`() {
-        val file = FileNode("/test/file.txt", "file.txt", 1024, false, false, emptyList(), 0L)
+        val file = createFileNode("/test/file.txt", "file.txt", 1024, false)
 
         assertEquals(1024, file.totalSize())
     }
 
     @Test
     fun `should return zero for empty directory`() {
-        val emptyDir = FileNode("/test/empty", "empty", 0, true, false, emptyList(), 0L)
+        val emptyDir = createFileNode("/test/empty", "empty", 0, true)
 
         assertEquals(0, emptyDir.totalSize())
     }
 
     @Test
     fun `should check if directory is empty`() {
-        val emptyDir = FileNode("/test/empty", "empty", 0, true, false, emptyList(), 0L)
-        val nonEmptyDir = FileNode("/test/nonempty", "nonempty", 0, true, false,
-            listOf(FileNode("/test/nonempty/file.txt", "file.txt", 100, false, false, emptyList(), 0L)),
-            0L
+        val emptyDir = createFileNode("/test/empty", "empty", 0, true)
+        val nonEmptyDir = createFileNode("/test/nonempty", "nonempty", 0, true,
+            children = listOf(createFileNode("/test/nonempty/file.txt", "file.txt", 100, false))
         )
 
         assertTrue(emptyDir.isEmpty())
@@ -118,27 +115,27 @@ class FileNodeTest {
 
     @Test
     fun `should count total files recursively`() {
-        val child1 = FileNode("/test/file1.txt", "file1.txt", 100, false, false, emptyList(), 0L)
-        val child2 = FileNode("/test/file2.txt", "file2.txt", 200, false, false, emptyList(), 0L)
-        val subdir = FileNode("/test/subdir", "subdir", 0, true, false,
-            listOf(
-                FileNode("/test/subdir/file3.txt", "file3.txt", 300, false, false, emptyList(), 0L),
-                FileNode("/test/subdir/file4.txt", "file4.txt", 400, false, false, emptyList(), 0L)
-            ), 0L
+        val child1 = createFileNode("/test/file1.txt", "file1.txt", 100, false)
+        val child2 = createFileNode("/test/file2.txt", "file2.txt", 200, false)
+        val subdir = createFileNode("/test/subdir", "subdir", 0, true,
+            children = listOf(
+                createFileNode("/test/subdir/file3.txt", "file3.txt", 300, false),
+                createFileNode("/test/subdir/file4.txt", "file4.txt", 400, false)
+            )
         )
 
-        val root = FileNode("/test", "test", 0, true, false, listOf(child1, child2, subdir), 0L)
+        val root = createFileNode("/test", "test", 0, true, children = listOf(child1, child2, subdir))
 
         assertEquals(4, root.fileCount())
     }
 
     @Test
     fun `should count total directories recursively`() {
-        val subsubdir = FileNode("/test/sub/subsub", "subsub", 0, true, false, emptyList(), 0L)
-        val subdir1 = FileNode("/test/sub1", "sub1", 0, true, false, listOf(subsubdir), 0L)
-        val subdir2 = FileNode("/test/sub2", "sub2", 0, true, false, emptyList(), 0L)
+        val subsubdir = createFileNode("/test/sub/subsub", "subsub", 0, true)
+        val subdir1 = createFileNode("/test/sub1", "sub1", 0, true, children = listOf(subsubdir))
+        val subdir2 = createFileNode("/test/sub2", "sub2", 0, true)
 
-        val root = FileNode("/test", "test", 0, true, false, listOf(subdir1, subdir2), 0L)
+        val root = createFileNode("/test", "test", 0, true, children = listOf(subdir1, subdir2))
 
         // Should count sub1, sub2, and subsub = 3
         assertEquals(3, root.directoryCount())
@@ -146,7 +143,7 @@ class FileNodeTest {
 
     @Test
     fun `should return zero counts for file node`() {
-        val file = FileNode("/test/file.txt", "file.txt", 1024, false, false, emptyList(), 0L)
+        val file = createFileNode("/test/file.txt", "file.txt", 1024, false)
 
         assertEquals(1, file.fileCount()) // The file itself
         assertEquals(0, file.directoryCount())

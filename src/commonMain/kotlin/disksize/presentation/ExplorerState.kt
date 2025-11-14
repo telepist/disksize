@@ -214,7 +214,7 @@ private fun updateNodeInTree(node: FileNode, pathToUpdate: String, newNode: File
                 child
             }
         }
-        return node.copy(children = updatedChildren)
+        return node.withChildren(updatedChildren)
     }
 
     return node
@@ -231,7 +231,7 @@ private fun removeNodeFromTree(node: FileNode, pathToRemove: String): FileNode {
         val updatedChildren = node.children
             .filterNot { it.path == pathToRemove }
             .map { removeNodeFromTree(it, pathToRemove) }
-        return node.copy(children = updatedChildren)
+        return node.withChildren(updatedChildren)
     }
 
     return node

@@ -4,6 +4,7 @@ import disksize.data.fake.FakeFileSystemRepository
 import disksize.domain.model.FileNode
 import disksize.domain.model.ScanProgress
 import disksize.domain.model.ScanStatus
+import disksize.domain.model.createFileNode
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import kotlin.test.BeforeTest
@@ -26,9 +27,9 @@ class ScanDirectoryUseCaseTest {
     @Test
     fun `should scan directory and return scan result`() = runTest {
         // Given
-        val child1 = FileNode("/test/file1.txt", "file1.txt", 100, false, false, emptyList(), 0L)
-        val child2 = FileNode("/test/file2.txt", "file2.txt", 200, false, false, emptyList(), 0L)
-        val testNode = FileNode(
+        val child1 = createFileNode("/test/file1.txt", "file1.txt", 100, false, false, emptyList(), 0L)
+        val child2 = createFileNode("/test/file2.txt", "file2.txt", 200, false, false, emptyList(), 0L)
+        val testNode = createFileNode(
             path = "/test",
             name = "test",
             size = 0,
@@ -52,9 +53,9 @@ class ScanDirectoryUseCaseTest {
     @Test
     fun `should calculate directory counts correctly`() = runTest {
         // Given
-        val subdir1 = FileNode("/test/subdir1", "subdir1", 0, true, false, emptyList(), 0L)
-        val subdir2 = FileNode("/test/subdir2", "subdir2", 0, true, false, emptyList(), 0L)
-        val testNode = FileNode(
+        val subdir1 = createFileNode("/test/subdir1", "subdir1", 0, true, false, emptyList(), 0L)
+        val subdir2 = createFileNode("/test/subdir2", "subdir2", 0, true, false, emptyList(), 0L)
+        val testNode = createFileNode(
             path = "/test",
             name = "test",
             size = 0,
@@ -86,7 +87,7 @@ class ScanDirectoryUseCaseTest {
     @Test
     fun `should return empty errors list on successful scan`() = runTest {
         // Given
-        val testNode = FileNode("/test", "test", 0, true, false, emptyList(), 0L)
+        val testNode = createFileNode("/test", "test", 0, true, false, emptyList(), 0L)
         repository.addFile(testNode)
 
         // When
@@ -101,8 +102,8 @@ class ScanDirectoryUseCaseTest {
 
     @Test
     fun `should surface repository warnings`() = runTest {
-        val child = FileNode("/test/secret", "secret", 0, true, false, emptyList(), 0L)
-        val testNode = FileNode(
+        val child = createFileNode("/test/secret", "secret", 0, true, false, emptyList(), 0L)
+        val testNode = createFileNode(
             path = "/test",
             name = "test",
             size = 0,
@@ -127,7 +128,7 @@ class ScanDirectoryUseCaseTest {
     @Test
     fun `should record scan duration`() = runTest {
         // Given
-        val testNode = FileNode("/test", "test", 0, true, false, emptyList(), 0L)
+        val testNode = createFileNode("/test", "test", 0, true, false, emptyList(), 0L)
         repository.addFile(testNode)
 
         // When
@@ -142,10 +143,10 @@ class ScanDirectoryUseCaseTest {
     @Test
     fun `should handle nested directory structure`() = runTest {
         // Given
-        val deepFile = FileNode("/test/sub1/sub2/file.txt", "file.txt", 500, false, false, emptyList(), 0L)
-        val sub2 = FileNode("/test/sub1/sub2", "sub2", 0, true, false, listOf(deepFile), 0L)
-        val sub1 = FileNode("/test/sub1", "sub1", 0, true, false, listOf(sub2), 0L)
-        val testNode = FileNode("/test", "test", 0, true, false, listOf(sub1), 0L)
+        val deepFile = createFileNode("/test/sub1/sub2/file.txt", "file.txt", 500, false, false, emptyList(), 0L)
+        val sub2 = createFileNode("/test/sub1/sub2", "sub2", 0, true, false, listOf(deepFile), 0L)
+        val sub1 = createFileNode("/test/sub1", "sub1", 0, true, false, listOf(sub2), 0L)
+        val testNode = createFileNode("/test", "test", 0, true, false, listOf(sub1), 0L)
         repository.addFile(testNode)
 
         // When
@@ -161,10 +162,10 @@ class ScanDirectoryUseCaseTest {
 
     @Test
     fun `should forward progress updates`() = runTest {
-        val deepFile = FileNode("/test/sub/file.txt", "file.txt", 100, false, false, emptyList(), 0L)
-        val subDir = FileNode("/test/sub", "sub", 0, true, false, listOf(deepFile), 0L)
-        val sibling = FileNode("/test/other.txt", "other.txt", 50, false, false, emptyList(), 0L)
-        val root = FileNode("/test", "test", 0, true, false, listOf(subDir, sibling), 0L)
+        val deepFile = createFileNode("/test/sub/file.txt", "file.txt", 100, false, false, emptyList(), 0L)
+        val subDir = createFileNode("/test/sub", "sub", 0, true, false, listOf(deepFile), 0L)
+        val sibling = createFileNode("/test/other.txt", "other.txt", 50, false, false, emptyList(), 0L)
+        val root = createFileNode("/test", "test", 0, true, false, listOf(subDir, sibling), 0L)
         repository.addFile(root)
 
         val emissions = useCase.scan("/test").toList()

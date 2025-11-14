@@ -79,3 +79,7 @@ gradle.properties.local
 node_modules/
 package.json
 package-lock.json
+
+### Performance testing ###
+perf-results/
+*.perf.txt

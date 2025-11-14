@@ -8,7 +8,7 @@ class ScanResultTest {
 
     @Test
     fun `should create scan result with basic properties`() {
-        val rootNode = FileNode("/test", "test", 0, true, false, emptyList(), 0L)
+        val rootNode = createFileNode("/test", "test", 0, true, false, emptyList(), 0L)
         val result = ScanResult(
             rootPath = "/test",
             totalSize = 1024L,
@@ -30,7 +30,7 @@ class ScanResultTest {
 
     @Test
     fun `should create scan result with errors`() {
-        val rootNode = FileNode("/test", "test", 0, true, false, emptyList(), 0L)
+        val rootNode = createFileNode("/test", "test", 0, true, false, emptyList(), 0L)
         val errors = listOf(
             ScanError("/test/restricted", "Permission denied", ErrorType.PERMISSION_DENIED),
             ScanError("/test/missing", "File not found", ErrorType.NOT_FOUND)
@@ -53,7 +53,7 @@ class ScanResultTest {
 
     @Test
     fun `should check if scan has errors`() {
-        val rootNode = FileNode("/test", "test", 0, true, false, emptyList(), 0L)
+        val rootNode = createFileNode("/test", "test", 0, true, false, emptyList(), 0L)
 
         val resultWithoutErrors = ScanResult(
             rootPath = "/test",
