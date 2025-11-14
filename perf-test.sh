@@ -15,8 +15,8 @@ NC='\033[0m' # No Color
 # Default configuration
 TEST_DIR="${TMPDIR:-/tmp}/disksize-perf-test"
 RESULTS_DIR="./perf-results"
-BINARY="./build/bin/macosArm64/debugExecutable/disksize.kexe"
-BUILD_TYPE="debug"
+BINARY="./build/bin/macosArm64/releaseExecutable/disksize.kexe"
+BUILD_TYPE="release"
 
 # Function to get test config by name
 get_test_config() {
@@ -153,8 +153,13 @@ create_test_structure() {
 build_binary() {
     header "Building DiskSize ($BUILD_TYPE)"
 
-    log_info "Building binary..."
-    ./gradlew linkMacosArm64 -q
+    if [ "$BUILD_TYPE" == "release" ]; then
+        log_info "Building release binary..."
+        ./gradlew linkReleaseExecutableMacosArm64 -q
+    else
+        log_info "Building debug binary..."
+        ./gradlew linkDebugExecutableMacosArm64 -q
+    fi
 
     if [ ! -f "$BINARY" ]; then
         log_error "Binary not found at $BINARY"
