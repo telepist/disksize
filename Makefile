@@ -3,39 +3,34 @@
 .PHONY: help build run clean build-all build-release run-release test test-coverage
 
 # Detect OS and architecture
-# Check for Windows CMD/PowerShell vs Unix-like shells
-# We use uname to detect the environment - if uname exists, we're in a Unix-like shell
-UNAME_S := $(shell uname -s 2>NUL)
-UNAME_M := $(shell uname -m 2>NUL)
+# On Windows, rely on the OS / MSYSTEM environment variables so we don't need uname.
+# On Unix-like systems, use uname to differentiate macOS vs Linux and architecture.
+ifeq ($(OS),Windows_NT)
+    # Windows family (CMD, PowerShell, Git Bash, MSYS2)
 
-ifeq ($(UNAME_S),)
-    # uname doesn't exist - we're in Windows CMD or PowerShell
-    PLATFORM := MingwX64
-    PLATFORM_DIR := mingwX64
-    EXECUTABLE := disksize.exe
-    GRADLE := gradlew.bat
-    GRADLE_END :=
-    OS_NAME := Windows
+    ifneq ($(MSYSTEM),)
+        # Windows (Git Bash / MSYS shells)
+        PLATFORM := MingwX64
+        PLATFORM_DIR := mingwX64
+        EXECUTABLE := disksize.exe
+        GRADLE := bash -c "./gradlew
+        GRADLE_END := "
+        OS_NAME := Windows ($(MSYSTEM))
+    else
+        # Windows CMD or PowerShell
+        PLATFORM := MingwX64
+        PLATFORM_DIR := mingwX64
+        EXECUTABLE := disksize.exe
+        GRADLE := gradlew.bat
+        GRADLE_END :=
+        OS_NAME := Windows
+    endif
 else
-    # Unix-like systems (macOS, Linux, Git Bash)
+    # Unix-like systems (macOS, Linux)
+    UNAME_S := $(shell uname -s 2>/dev/null)
+    UNAME_M := $(shell uname -m 2>/dev/null)
 
-    ifeq ($(findstring MINGW,$(UNAME_S)),MINGW)
-        # Windows (Git Bash/MSYS)
-        PLATFORM := MingwX64
-        PLATFORM_DIR := mingwX64
-        EXECUTABLE := disksize.exe
-        GRADLE := bash -c "./gradlew
-        GRADLE_END := "
-        OS_NAME := Windows (Git Bash)
-    else ifeq ($(findstring MSYS,$(UNAME_S)),MSYS)
-        # Windows (MSYS2)
-        PLATFORM := MingwX64
-        PLATFORM_DIR := mingwX64
-        EXECUTABLE := disksize.exe
-        GRADLE := bash -c "./gradlew
-        GRADLE_END := "
-        OS_NAME := Windows (MSYS2)
-    else ifeq ($(UNAME_S),Darwin)
+    ifeq ($(UNAME_S),Darwin)
         # macOS
         ifeq ($(UNAME_M),arm64)
             PLATFORM := MacosArm64
