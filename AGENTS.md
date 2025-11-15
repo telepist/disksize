@@ -26,7 +26,10 @@
 - Name test classes after the subject (`DiskUsageFormatterTest`) and use descriptive `@Test` method names that read like sentences.
 
 ## Commit & Pull Request Guidelines
-- Write imperative, present-tense commit summaries similar to `Add ScanDirectoryUseCase`; keep the subject under 72 characters and include a focused body when needed.
+- Only commit when the user explicitly asks; never commit proactively without being told.
+- Write concise, imperative commit summaries (e.g., `Add ScanDirectoryUseCase`, `Fix memory leak in scanner`); keep the subject under 72 characters.
+- Keep commit bodies brief—2-4 bullet points maximum explaining what changed and why, not implementation details.
+- Avoid verbose explanations; the code diff speaks for itself—focus on the "why" not the "what".
 - One feature or fix per commit; include relevant docs or test updates in the same change.
 - Pull requests must link the tracking issue, outline verification steps, and attach screenshots or terminal captures for UI/TUI changes.
 - Confirm all applicable Make/Gradle commands pass before requesting review and note any follow-up work explicitly.
