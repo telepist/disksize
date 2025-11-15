@@ -11,22 +11,9 @@ import platform.windows.*
 import kotlin.Exception
 
 @OptIn(ExperimentalForeignApi::class)
-class WindowsFileSystemRepository : FileSystemRepository {
+class WindowsFileSystemRepository : FileSystemRepository() {
 
-    override fun scanDirectory(path: String): Flow<DirectoryScanUpdate> = flow {
-        val errors = mutableListOf<ScanError>()
-
-        val tracker = AdaptiveProgressTracker(
-            emitProgress = { progress -> emit(DirectoryScanUpdate.Progress(progress)) },
-            batchSize = 100,
-            minIntervalMs = 50
-        )
-        val node = scanDirectoryRecursive(path, errors, tracker, isRoot = true)
-        tracker.onComplete()
-        emit(DirectoryScanUpdate.Complete(FileSystemRepository.DirectoryScanResult(node, errors)))
-    }
-
-    private suspend fun scanDirectoryRecursive(
+    override suspend fun scanDirectoryRecursive(
         path: String,
         errors: MutableList<ScanError>,
         tracker: AdaptiveProgressTracker,
@@ -104,32 +91,7 @@ class WindowsFileSystemRepository : FileSystemRepository {
 
         tracker.onDirectoryProcessed(baseNode.path, isRoot, filesInDir, directoriesInDir)
 
-        // Calculate aggregates for this directory from its children
-        var totalSize = baseNode.size
-        var totalFiles = 0
-        var totalDirs = 0
-
-        for (child in children) {
-            totalSize += child.cachedTotalSize
-            totalFiles += child.cachedFileCount
-            totalDirs += child.cachedDirectoryCount
-            if (child.isDirectory) {
-                totalDirs += 1  // Count the directory itself
-            }
-        }
-
-        return baseNode.copy(
-            children = children,
-            cachedTotalSize = totalSize,
-            cachedFileCount = totalFiles,
-            cachedDirectoryCount = totalDirs
-        )
-    }
-
-    override suspend fun getFileInfo(path: String): Result<FileNode> = try {
-        Result.success(createFileNode(path))
-    } catch (e: Exception) {
-        Result.failure(e)
+        return calculateAggregates(baseNode, children)
     }
 
     override suspend fun exists(path: String): Boolean = memScoped {
@@ -142,34 +104,13 @@ class WindowsFileSystemRepository : FileSystemRepository {
         return exists(path)
     }
 
-    override suspend fun delete(path: String): Result<FileSystemRepository.DeletionStats> = try {
-        // First, get the file info to know what we're deleting
-        val node = createFileNode(path)
-        val totalSize = node.totalSize()
-
-        // Perform deletion
-        val itemsDeleted = if (node.isDirectory) {
-            deleteDirectoryRecursive(path)
-        } else {
-            deleteFile(path)
-            1
-        }
-
-        Result.success(FileSystemRepository.DeletionStats(
-            itemsDeleted = itemsDeleted,
-            bytesFreed = totalSize
-        ))
-    } catch (e: Exception) {
-        Result.failure(e)
-    }
-
-    private fun deleteFile(path: String) {
+    override fun deleteFile(path: String) {
         if (DeleteFileW(path) == 0) {
             throw Exception("Failed to delete file: $path")
         }
     }
 
-    private fun deleteDirectoryRecursive(path: String): Int {
+    override fun deleteDirectoryRecursive(path: String): Int {
         var deletedCount = 0
 
         val searchPath = normalizeSearchPath(path)
@@ -218,7 +159,7 @@ class WindowsFileSystemRepository : FileSystemRepository {
         return deletedCount + 1  // +1 for the directory itself
     }
 
-    private fun createFileNode(path: String): FileNode = platformCreateFileNode(path)
+    override fun createFileNode(path: String): FileNode = platformCreateFileNode(path)
 }
 
 private fun normalizeSearchPath(path: String): String {

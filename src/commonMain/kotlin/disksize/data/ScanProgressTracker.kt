@@ -10,7 +10,7 @@ import disksize.domain.model.ScanProgress
  * @param batchSize Number of files to process before checking if an update should be emitted
  * @param minIntervalMs Minimum time interval in milliseconds between progress updates
  */
-internal class AdaptiveProgressTracker(
+class AdaptiveProgressTracker(
     private val emitProgress: suspend (ScanProgress) -> Unit,
     private val batchSize: Int = 100,
     private val minIntervalMs: Long = 50
@@ -90,7 +90,7 @@ internal class AdaptiveProgressTracker(
 /**
  * Classify an exception into an appropriate error type based on its message.
  */
-internal fun classifyError(exception: Exception): disksize.domain.model.ErrorType {
+fun classifyError(exception: Exception): disksize.domain.model.ErrorType {
     val message = exception.message?.lowercase() ?: return disksize.domain.model.ErrorType.UNKNOWN
     return when {
         "permission" in message && "denied" in message -> disksize.domain.model.ErrorType.PERMISSION_DENIED
