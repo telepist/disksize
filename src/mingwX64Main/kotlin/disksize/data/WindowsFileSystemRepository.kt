@@ -41,7 +41,7 @@ class WindowsFileSystemRepository : FileSystemRepository() {
         var filesInDir = 0
         var directoriesInDir = 0
 
-        val searchPath = normalizeSearchPath(path)
+        val searchPath = WindowsPathUtils.toSearchPath(path)
 
         memScoped {
             val findData = alloc<WIN32_FIND_DATAW>()
@@ -63,7 +63,7 @@ class WindowsFileSystemRepository : FileSystemRepository() {
                     val name = findData.cFileName.toKString()
                     if (name == "." || name == "..") continue
 
-                    val childPath = resolveChildPath(path, name)
+                    val childPath = WindowsPathUtils.joinPath(path, name)
 
                     try {
                         val childNode = createFileNode(childPath)
@@ -123,7 +123,7 @@ class WindowsFileSystemRepository : FileSystemRepository() {
     override fun deleteDirectoryRecursive(path: String): Int {
         var deletedCount = 0
 
-        val searchPath = normalizeSearchPath(path)
+        val searchPath = WindowsPathUtils.toSearchPath(path)
 
         memScoped {
             val findData = alloc<WIN32_FIND_DATAW>()
@@ -139,7 +139,7 @@ class WindowsFileSystemRepository : FileSystemRepository() {
                     val name = findData.cFileName.toKString()
                     if (name == "." || name == "..") continue
 
-                    val childPath = resolveChildPath(path, name)
+                    val childPath = WindowsPathUtils.joinPath(path, name)
 
                     try {
                         val childNode = createFileNode(childPath)
@@ -170,22 +170,4 @@ class WindowsFileSystemRepository : FileSystemRepository() {
     }
 
     override fun createFileNode(path: String): FileNode = platformCreateFileNode(path)
-}
-
-private fun normalizeSearchPath(path: String): String {
-    val normalized = path.replace('/', '\\')
-    return if (normalized.endsWith("\\")) {
-        "${normalized}*"
-    } else {
-        "$normalized\\*"
-    }
-}
-
-private fun resolveChildPath(parent: String, childName: String): String {
-    val normalizedParent = parent.replace('/', '\\')
-    return when {
-        normalizedParent.isEmpty() -> childName
-        normalizedParent.endsWith("\\") -> normalizedParent + childName
-        else -> "$normalizedParent\\$childName"
-    }
 }

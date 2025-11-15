@@ -9,7 +9,7 @@ internal fun platformCreateFileNode(path: String): FileNode = memScoped {
     val findData = alloc<WIN32_FIND_DATAW>()
 
     // Normalize path for Windows
-    val normalizedPath = path.replace('/', '\\')
+    val normalizedPath = WindowsPathUtils.normalize(path)
 
     // Use FindFirstFile to get file information (works for both files and directories)
     val handle = FindFirstFileW(normalizedPath, findData.ptr)
@@ -21,7 +21,7 @@ internal fun platformCreateFileNode(path: String): FileNode = memScoped {
     FindClose(handle)
 
     // Extract file information
-    val name = normalizedPath.substringAfterLast('\\').ifEmpty { normalizedPath }
+    val name = WindowsPathUtils.extractName(path)
 
     val fileSize = (findData.nFileSizeHigh.toLong() shl 32) or findData.nFileSizeLow.toLong()
 
