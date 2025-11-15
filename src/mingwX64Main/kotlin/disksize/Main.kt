@@ -1,15 +1,49 @@
 package disksize
 
+import com.jakewharton.mosaic.runMosaic
+import disksize.data.WindowsFileSystemRepository
+import disksize.domain.usecase.DeleteFileUseCase
+import disksize.domain.usecase.ScanDirectoryUseCase
+import disksize.ui.DiskSizeApp
+import kotlinx.cinterop.*
+import kotlinx.coroutines.runBlocking
+import platform.windows.GetCurrentDirectoryW
+import platform.windows.MAX_PATH
+
 /**
- * Main entry point for DiskSize application - Windows stub.
- * Windows support is not yet implemented in MVP 1.
+ * Entry point for Windows native target.
  */
+@OptIn(ExperimentalForeignApi::class)
 fun main(args: Array<String>) {
-    println("DiskSize - Disk Space Analyzer")
-    println()
-    println("ERROR: Windows support is not yet implemented.")
-    println("Please use macOS or Linux for now.")
-    println()
-    println("MVP 1 focuses on POSIX-based systems (macOS/Linux).")
-    println("Windows support will be added in a future release.")
+    val targetPath = if (args.isNotEmpty()) {
+        args[0]
+    } else {
+        getCurrentDirectory()
+    }
+
+    runBlocking {
+        val repository = WindowsFileSystemRepository()
+        val scanUseCase = ScanDirectoryUseCase(repository)
+        val deleteUseCase = DeleteFileUseCase(repository)
+
+        runMosaic {
+            DiskSizeApp(
+                initialPath = targetPath,
+                scanDirectoryUseCase = scanUseCase,
+                deleteFileUseCase = deleteUseCase
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalForeignApi::class)
+private fun getCurrentDirectory(): String = memScoped {
+    val bufferSize = MAX_PATH.toInt()
+    val buffer: CPointer<UShortVar> = allocArray(bufferSize)
+    val length = GetCurrentDirectoryW(bufferSize.toUInt(), buffer)
+    if (length == 0u) {
+        "."
+    } else {
+        buffer.toKString()
+    }
 }
