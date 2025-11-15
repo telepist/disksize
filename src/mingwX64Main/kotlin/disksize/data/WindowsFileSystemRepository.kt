@@ -152,8 +152,8 @@ class WindowsFileSystemRepository : FileSystemRepository() {
                             deletedCount++
                         }
                     } catch (e: Exception) {
-                        // Continue with other files even if one fails
-                        throw Exception("Failed to delete child: $childPath - ${e.message}")
+                        // Include partial deletion count in error message
+                        throw Exception("Failed to delete child: $childPath - ${e.message} ($deletedCount items deleted before failure)")
                     }
                 } while (FindNextFileW(handle, findData.ptr) != 0)
             } finally {
