@@ -12,8 +12,12 @@ import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.pointed
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.toKString
+import platform.posix.EACCES
+import platform.posix.ENOENT
+import platform.posix.EPERM
 import platform.posix.access
 import platform.posix.closedir
+import platform.posix.errno
 import platform.posix.opendir
 import platform.posix.readdir
 import platform.posix.rmdir
@@ -25,6 +29,15 @@ import kotlin.math.max
 
 @OptIn(ExperimentalForeignApi::class)
 class PosixFileSystemRepository : FileSystemRepository() {
+
+    override fun classifyError(error: Throwable): ErrorType {
+        val code = errno
+        return when (code) {
+            EACCES, EPERM -> ErrorType.PERMISSION_DENIED
+            ENOENT -> ErrorType.NOT_FOUND
+            else -> super.classifyError(error)
+        }
+    }
 
     override suspend fun scanDirectoryRecursive(
         path: String,

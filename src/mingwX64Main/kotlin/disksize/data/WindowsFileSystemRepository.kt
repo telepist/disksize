@@ -13,6 +13,15 @@ import kotlin.Exception
 @OptIn(ExperimentalForeignApi::class)
 class WindowsFileSystemRepository : FileSystemRepository() {
 
+    override fun classifyError(error: Throwable): ErrorType {
+        val code = GetLastError().toInt()
+        return when (code) {
+            ERROR_ACCESS_DENIED -> ErrorType.PERMISSION_DENIED
+            ERROR_FILE_NOT_FOUND, ERROR_PATH_NOT_FOUND -> ErrorType.NOT_FOUND
+            else -> super.classifyError(error)
+        }
+    }
+
     override suspend fun scanDirectoryRecursive(
         path: String,
         errors: MutableList<ScanError>,
@@ -40,10 +49,11 @@ class WindowsFileSystemRepository : FileSystemRepository() {
 
             if (handle == INVALID_HANDLE_VALUE) {
                 tracker.onDirectoryProcessed(baseNode.path, isRoot, filesInDir = 0, directoriesInDir = 0)
+                val exception = Exception("Cannot open directory: $path")
                 errors += ScanError(
                     path = path,
-                    message = "Cannot open directory: $path",
-                    type = ErrorType.IO_ERROR
+                    message = exception.message ?: "Cannot open directory: $path",
+                    type = classifyError(exception)
                 )
                 return baseNode.copy(children = emptyList())
             }

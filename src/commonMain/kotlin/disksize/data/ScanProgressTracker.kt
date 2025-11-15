@@ -86,17 +86,3 @@ class AdaptiveProgressTracker(
         emit()
     }
 }
-
-/**
- * Classify an exception into an appropriate error type based on its message.
- */
-fun classifyError(exception: Exception): disksize.domain.model.ErrorType {
-    val message = exception.message?.lowercase() ?: return disksize.domain.model.ErrorType.UNKNOWN
-    return when {
-        "permission" in message && "denied" in message -> disksize.domain.model.ErrorType.PERMISSION_DENIED
-        "access" in message && "denied" in message -> disksize.domain.model.ErrorType.PERMISSION_DENIED
-        "not found" in message -> disksize.domain.model.ErrorType.NOT_FOUND
-        "no such file" in message -> disksize.domain.model.ErrorType.NOT_FOUND
-        else -> disksize.domain.model.ErrorType.IO_ERROR
-    }
-}

@@ -38,8 +38,12 @@ class DeleteFileUseCase(
                 )
             },
             onFailure = { error ->
-                val message = error.message ?: "Failed to delete: $path"
-                val errorType = classifyError(message)
+                val errorType = repository.classifyError(error)
+                val message = error.message ?: when (errorType) {
+                    ErrorType.PERMISSION_DENIED -> "Permission denied: $path"
+                    ErrorType.NOT_FOUND -> "File or directory not found: $path"
+                    else -> "Failed to delete: $path"
+                }
                 DeletionResult.Failure(
                     path = path,
                     message = message,
@@ -47,15 +51,5 @@ class DeleteFileUseCase(
                 )
             }
         )
-    }
-
-    private fun classifyError(message: String): ErrorType {
-        val lowerMessage = message.lowercase()
-        return when {
-            "permission" in lowerMessage && "denied" in lowerMessage -> ErrorType.PERMISSION_DENIED
-            "not found" in lowerMessage -> ErrorType.NOT_FOUND
-            "no such file" in lowerMessage -> ErrorType.NOT_FOUND
-            else -> ErrorType.IO_ERROR
-        }
     }
 }

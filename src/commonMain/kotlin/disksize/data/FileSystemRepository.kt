@@ -1,5 +1,6 @@
 package disksize.data
 
+import disksize.domain.model.ErrorType
 import disksize.domain.model.FileNode
 import disksize.domain.model.ScanError
 import disksize.domain.model.ScanProgress
@@ -79,12 +80,66 @@ abstract class FileSystemRepository {
             1
         }
 
-        Result.success(DeletionStats(
-            itemsDeleted = itemsDeleted,
-            bytesFreed = totalSize
-        ))
+        Result.success(
+            DeletionStats(
+                itemsDeleted = itemsDeleted,
+                bytesFreed = totalSize
+            )
+        )
     } catch (e: Exception) {
         Result.failure(e)
+    }
+
+    /**
+     * Classification entrypoint used by higher layers (use cases, presenters)
+     * and by platform repositories themselves when emitting [ScanError]s.
+     *
+     * Platform-specific repositories may override this to incorporate native
+     * error codes (errno, GetLastError, etc.) while still falling back to the
+     * shared message-based heuristics in [classifyErrorMessage].
+     */
+    open fun classifyError(error: Throwable): ErrorType =
+        classifyErrorMessage(error.message)
+
+    /**
+     * Default message-based error classification shared across platforms.
+     *
+     * This provides a stable fallback when platform error codes are not
+     * available or not recognised.
+     */
+    open fun classifyErrorMessage(message: String?): ErrorType {
+        if (message == null) return ErrorType.UNKNOWN
+
+        val lower = message.lowercase()
+
+        // Permission / access errors (Unix and Windows)
+        if (
+            containsAny(
+                lower,
+                "permission denied",
+                "access denied",
+                "operation not permitted",
+                "read-only file system"
+            )
+        ) {
+            return ErrorType.PERMISSION_DENIED
+        }
+
+        // Not-found style errors (Unix and Windows)
+        if (
+            containsAny(
+                lower,
+                "not found",
+                "no such file",
+                "cannot find the file",
+                "cannot find the path"
+            )
+        ) {
+            return ErrorType.NOT_FOUND
+        }
+
+        // If we recognised the message at all but it didn't match above, treat as IO_ERROR.
+        return ErrorType.IO_ERROR
     }
 
     /**
@@ -151,6 +206,9 @@ abstract class FileSystemRepository {
         )
     }
 }
+
+private fun containsAny(haystack: String, vararg needles: String): Boolean =
+    needles.any { it in haystack }
 
 sealed interface DirectoryScanUpdate {
     data class Progress(val progress: ScanProgress) : DirectoryScanUpdate
