@@ -221,83 +221,6 @@ class WindowsFileSystemRepository : FileSystemRepository {
     private fun createFileNode(path: String): FileNode = platformCreateFileNode(path)
 }
 
-private class AdaptiveProgressTracker(
-    private val emitProgress: suspend (ScanProgress) -> Unit,
-    private val batchSize: Int = 100,
-    private val minIntervalMs: Long = 50
-) {
-    private val startTime = kotlin.time.TimeSource.Monotonic.markNow()
-
-    private var processedFiles = 0
-    private var processedDirectories = 0
-    private var scannedBytes = 0L
-
-    private var filesProcessedSinceLastEmit = 0
-    private var lastEmitTime = 0L
-
-    private var currentPath: String? = null
-
-    suspend fun startDirectory(path: String, isRoot: Boolean) {
-        currentPath = path
-        emitIfBatchReady()
-    }
-
-    suspend fun onFileProcessed(path: String, size: Long) {
-        processedFiles++
-        scannedBytes += size
-        filesProcessedSinceLastEmit++
-        currentPath = path
-        emitIfBatchReady()
-    }
-
-    suspend fun onDirectoryProcessed(
-        path: String,
-        isRoot: Boolean,
-        filesInDir: Int,
-        directoriesInDir: Int
-    ) {
-        if (!isRoot) {
-            processedDirectories++
-        }
-        currentPath = path
-        emitIfBatchReady()
-    }
-
-    private suspend fun emitIfBatchReady() {
-        val now = startTime.elapsedNow().inWholeMilliseconds
-        val timeSinceEmit = now - lastEmitTime
-
-        if (filesProcessedSinceLastEmit >= batchSize ||
-            timeSinceEmit >= minIntervalMs) {
-            emit()
-            filesProcessedSinceLastEmit = 0
-            lastEmitTime = now
-        }
-    }
-
-    private suspend fun emit() {
-        val elapsed = startTime.elapsedNow().inWholeMilliseconds
-        val bytesPerSecond = if (elapsed > 0) {
-            (scannedBytes * 1000) / elapsed
-        } else {
-            0L
-        }
-
-        emitProgress(ScanProgress(
-            processedFiles = processedFiles,
-            processedDirectories = processedDirectories,
-            scannedBytes = scannedBytes,
-            bytesPerSecond = bytesPerSecond,
-            currentDirectory = currentPath
-        ))
-    }
-
-    suspend fun onComplete() {
-        // Force final emit with current stats
-        emit()
-    }
-}
-
 private fun normalizeSearchPath(path: String): String {
     val normalized = path.replace('/', '\\')
     return if (normalized.endsWith("\\")) {
@@ -313,15 +236,5 @@ private fun resolveChildPath(parent: String, childName: String): String {
         normalizedParent.isEmpty() -> childName
         normalizedParent.endsWith("\\") -> normalizedParent + childName
         else -> "$normalizedParent\\$childName"
-    }
-}
-
-private fun classifyError(exception: Exception): ErrorType {
-    val message = exception.message?.lowercase() ?: return ErrorType.UNKNOWN
-    return when {
-        "permission" in message || "denied" in message || "access" in message -> ErrorType.PERMISSION_DENIED
-        "not found" in message -> ErrorType.NOT_FOUND
-        "no such file" in message -> ErrorType.NOT_FOUND
-        else -> ErrorType.IO_ERROR
     }
 }
