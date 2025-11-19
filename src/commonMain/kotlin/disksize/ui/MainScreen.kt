@@ -68,6 +68,11 @@ private fun handleKey(
     cancelDelete: () -> Unit,
     quit: () -> Unit
 ): Boolean {
+    // If deletion is in progress, ignore all keys
+    if (state.isDeletingInProgress) {
+        return false
+    }
+
     // If confirmation dialog is showing, only handle y/n/Escape
     if (state.confirmDeleteItem != null) {
         return when (event.key) {

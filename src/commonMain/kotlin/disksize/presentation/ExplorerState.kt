@@ -21,6 +21,7 @@ data class ExplorerState(
     val childDirectoryTotalSize: Long = 0L,
     val loadingDirectoryPath: String? = null,
     val confirmDeleteItem: BrowserItem? = null,
+    val isDeletingInProgress: Boolean = false,
     val scanStartTimeMark: TimeSource.Monotonic.ValueTimeMark? = null
 ) {
     val spinnerFrame: Char
@@ -127,7 +128,11 @@ fun ExplorerState.withConfirmDelete(item: BrowserItem): ExplorerState {
 }
 
 fun ExplorerState.cancelConfirmDelete(): ExplorerState {
-    return copy(confirmDeleteItem = null)
+    return copy(confirmDeleteItem = null, isDeletingInProgress = false)
+}
+
+fun ExplorerState.startDeleting(): ExplorerState {
+    return copy(isDeletingInProgress = true)
 }
 
 fun ExplorerState.withItemDeleted(deletedPath: String): ExplorerState {
@@ -161,7 +166,8 @@ fun ExplorerState.withItemDeleted(deletedPath: String): ExplorerState {
         browserItems = updatedItems,
         childDirectoryTotalSize = totalChildSize,
         selectedIndex = newIndex,
-        confirmDeleteItem = null
+        confirmDeleteItem = null,
+        isDeletingInProgress = false
     )
 }
 

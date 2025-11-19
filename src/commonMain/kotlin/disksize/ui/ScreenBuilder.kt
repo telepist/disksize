@@ -4,9 +4,14 @@ import com.jakewharton.mosaic.ui.Color
 import disksize.presentation.ExplorerState
 
 internal fun buildScreenLines(state: ExplorerState, width: Int, rows: Int): List<FrameLine> {
-    // If confirmation dialog is showing, render that instead
+    // If deletion is in progress, show the progress dialog
     state.confirmDeleteItem?.let { item ->
-        return confirmationDialog(item, width, rows)
+        if (state.isDeletingInProgress) {
+            return deletingProgressDialog(item, width, rows, state.spinnerFrame)
+        } else {
+            // Show confirmation dialog
+            return confirmationDialog(item, width, rows)
+        }
     }
 
     val lines = mutableListOf<FrameLine>()

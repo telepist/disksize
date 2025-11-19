@@ -17,6 +17,7 @@ import disksize.domain.usecase.ScanDirectoryUseCase
 import disksize.presentation.ExplorerState
 import disksize.presentation.cancelConfirmDelete
 import disksize.presentation.resetSelection
+import disksize.presentation.startDeleting
 import disksize.presentation.tickSpinner
 import disksize.presentation.withConfirmDelete
 import disksize.presentation.withError
@@ -93,11 +94,11 @@ fun DiskSizeApp(
         }
     }
 
-    LaunchedEffect(state.isLoading, pendingScan) {
-        if (!state.isLoading) return@LaunchedEffect
+    LaunchedEffect(state.isLoading, state.isDeletingInProgress, pendingScan) {
+        if (!state.isLoading && !state.isDeletingInProgress) return@LaunchedEffect
         while (true) {
             delay(120)
-            if (!state.isLoading) break
+            if (!state.isLoading && !state.isDeletingInProgress) break
             state = state.tickSpinner()
         }
     }
@@ -148,6 +149,7 @@ fun DiskSizeApp(
         },
         onConfirmDelete = {
             val itemToDelete = state.confirmDeleteItem ?: return@MainScreen
+            state = state.startDeleting()
             scope.launch {
                 val result = deleteFileUseCase.delete(itemToDelete.node.path)
                 when (result) {
