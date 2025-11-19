@@ -1,6 +1,6 @@
 # Makefile for DiskSize - Disk Space Analyzer TUI
 
-.PHONY: help build run clean build-all build-release run-release test test-coverage
+.PHONY: help build run clean build-all build-release run-release test test-coverage install uninstall
 
 # Detect OS and architecture
 # On Windows, rely on the OS / MSYSTEM environment variables so we don't need uname.
@@ -65,6 +65,10 @@ endif
 DEBUG_EXECUTABLE := ./build/bin/$(PLATFORM_DIR)/debugExecutable/$(EXECUTABLE)
 RELEASE_EXECUTABLE := ./build/bin/$(PLATFORM_DIR)/releaseExecutable/$(EXECUTABLE)
 
+# Install paths
+INSTALL_DIR ?= /usr/local/bin
+INSTALL_NAME := disksize
+
 # Default target
 help:
 	@echo "DiskSize - Available targets:"
@@ -76,6 +80,8 @@ help:
 	@echo "  make test            - Run all tests"
 	@echo "  make test-coverage   - Run tests and generate coverage report"
 	@echo "  make clean           - Clean build artifacts"
+	@echo "  make install         - Install release binary to $(INSTALL_DIR) (macOS only)"
+	@echo "  make uninstall       - Remove installed binary from $(INSTALL_DIR)"
 	@echo ""
 	@echo "Detected platform: $(PLATFORM) ($(OS_NAME))"
 	@echo "Note: TUI apps must be run in a real terminal, not through Gradle tasks."
@@ -120,3 +126,42 @@ test-coverage:
 clean:
 	$(GRADLE) clean$(GRADLE_END)
 	@echo "Build artifacts cleaned"
+
+# Install binary to system (macOS only for now)
+install: build-release
+ifeq ($(UNAME_S),Darwin)
+	@echo "Installing $(INSTALL_NAME) to $(INSTALL_DIR)..."
+	@if [ ! -d "$(INSTALL_DIR)" ]; then \
+		echo "Error: $(INSTALL_DIR) does not exist"; \
+		exit 1; \
+	fi
+	@if [ ! -w "$(INSTALL_DIR)" ]; then \
+		echo "Error: $(INSTALL_DIR) is not writable. Try: sudo make install"; \
+		exit 1; \
+	fi
+	@install -m 755 $(RELEASE_EXECUTABLE) $(INSTALL_DIR)/$(INSTALL_NAME)
+	@echo "✓ Installed $(INSTALL_NAME) to $(INSTALL_DIR)/$(INSTALL_NAME)"
+	@echo "  You can now run: $(INSTALL_NAME)"
+else
+	@echo "Error: Install target is currently only supported on macOS"
+	@exit 1
+endif
+
+# Uninstall binary from system
+uninstall:
+ifeq ($(UNAME_S),Darwin)
+	@echo "Uninstalling $(INSTALL_NAME) from $(INSTALL_DIR)..."
+	@if [ ! -f "$(INSTALL_DIR)/$(INSTALL_NAME)" ]; then \
+		echo "Error: $(INSTALL_NAME) is not installed in $(INSTALL_DIR)"; \
+		exit 1; \
+	fi
+	@if [ ! -w "$(INSTALL_DIR)/$(INSTALL_NAME)" ]; then \
+		echo "Error: Cannot remove $(INSTALL_DIR)/$(INSTALL_NAME). Try: sudo make uninstall"; \
+		exit 1; \
+	fi
+	@rm -f $(INSTALL_DIR)/$(INSTALL_NAME)
+	@echo "✓ Uninstalled $(INSTALL_NAME) from $(INSTALL_DIR)"
+else
+	@echo "Error: Uninstall target is currently only supported on macOS"
+	@exit 1
+endif
