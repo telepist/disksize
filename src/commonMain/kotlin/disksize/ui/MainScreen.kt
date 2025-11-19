@@ -82,6 +82,14 @@ private fun handleKey(
         }
     }
 
+    // If scanning is in progress, only allow quit
+    if (state.isLoading) {
+        return when (event.key) {
+            "q", "Q" -> { quit(); true }
+            else -> false
+        }
+    }
+
     // Normal navigation and operations
     return when (event.key) {
         "ArrowDown", "j" -> { moveSelection(1); true }
