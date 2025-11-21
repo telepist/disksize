@@ -20,7 +20,8 @@ internal fun deletingProgressDialog(
     screenHeight: Int,
     spinnerFrame: Char
 ): List<FrameLine> {
-    val dialogWidth = (screenWidth * 0.7).toInt().coerceIn(40, 80)
+    // Ensure dialog fits within screen, with minimum of 20 for very small terminals
+    val dialogWidth = (screenWidth * 0.7).toInt().coerceIn(20, minOf(80, screenWidth))
     val itemType = if (item.kind == BrowserItemKind.DIRECTORY) "directory" else "file"
     val itemName = item.node.name
     val itemSize = SizeFormatter.format(item.totalSize)
@@ -53,13 +54,14 @@ internal fun deletingProgressDialog(
 
     // Top padding
     repeat(verticalPadding) {
-        paddedLines += FrameLine(listOf(Segment(" ".repeat(screenWidth))))
+        paddedLines += FrameLine(listOf(Segment(" ".repeat(screenWidth.coerceAtLeast(0)))))
     }
 
     // Dialog lines with horizontal centering
     dialogLines.forEach { line ->
-        val leftPad = " ".repeat(horizontalPadding)
-        val rightPad = " ".repeat(screenWidth - dialogWidth - horizontalPadding)
+        val leftPad = " ".repeat(horizontalPadding.coerceAtLeast(0))
+        val rightPadWidth = (screenWidth - dialogWidth - horizontalPadding).coerceAtLeast(0)
+        val rightPad = " ".repeat(rightPadWidth)
         paddedLines += FrameLine(
             listOf(Segment(leftPad)) + line.segments + listOf(Segment(rightPad))
         )
@@ -68,7 +70,7 @@ internal fun deletingProgressDialog(
     // Bottom padding
     val remainingLines = screenHeight - paddedLines.size
     repeat(remainingLines.coerceAtLeast(0)) {
-        paddedLines += FrameLine(listOf(Segment(" ".repeat(screenWidth))))
+        paddedLines += FrameLine(listOf(Segment(" ".repeat(screenWidth.coerceAtLeast(0)))))
     }
 
     return paddedLines
@@ -87,7 +89,8 @@ internal fun confirmationDialog(
     screenWidth: Int,
     screenHeight: Int
 ): List<FrameLine> {
-    val dialogWidth = (screenWidth * 0.7).toInt().coerceIn(40, 80)
+    // Ensure dialog fits within screen, with minimum of 20 for very small terminals
+    val dialogWidth = (screenWidth * 0.7).toInt().coerceIn(20, minOf(80, screenWidth))
     val itemType = if (item.kind == BrowserItemKind.DIRECTORY) "directory" else "file"
     val itemName = item.node.name
     val itemSize = SizeFormatter.format(item.totalSize)
@@ -127,13 +130,14 @@ internal fun confirmationDialog(
 
     // Top padding
     repeat(verticalPadding) {
-        paddedLines += FrameLine(listOf(Segment(" ".repeat(screenWidth))))
+        paddedLines += FrameLine(listOf(Segment(" ".repeat(screenWidth.coerceAtLeast(0)))))
     }
 
     // Dialog lines with horizontal centering
     dialogLines.forEach { line ->
-        val leftPad = " ".repeat(horizontalPadding)
-        val rightPad = " ".repeat(screenWidth - dialogWidth - horizontalPadding)
+        val leftPad = " ".repeat(horizontalPadding.coerceAtLeast(0))
+        val rightPadWidth = (screenWidth - dialogWidth - horizontalPadding).coerceAtLeast(0)
+        val rightPad = " ".repeat(rightPadWidth)
         paddedLines += FrameLine(
             listOf(Segment(leftPad)) + line.segments + listOf(Segment(rightPad))
         )
@@ -142,7 +146,7 @@ internal fun confirmationDialog(
     // Bottom padding
     val remainingLines = screenHeight - paddedLines.size
     repeat(remainingLines.coerceAtLeast(0)) {
-        paddedLines += FrameLine(listOf(Segment(" ".repeat(screenWidth))))
+        paddedLines += FrameLine(listOf(Segment(" ".repeat(screenWidth.coerceAtLeast(0)))))
     }
 
     return paddedLines

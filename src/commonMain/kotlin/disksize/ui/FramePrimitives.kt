@@ -27,25 +27,33 @@ internal fun FrameLines(lines: List<FrameLine>) {
     lines.forEach { FrameLineRow(it) }
 }
 
-internal fun topBorder(width: Int): FrameLine =
-    FrameLine(listOf(Segment("╔" + "═".repeat(width - 2) + "╗", Color.Cyan)))
+internal fun topBorder(width: Int): FrameLine {
+    val innerWidth = (width - 2).coerceAtLeast(0)
+    return FrameLine(listOf(Segment("╔" + "═".repeat(innerWidth) + "╗", Color.Cyan)))
+}
 
-internal fun middleBorder(width: Int): FrameLine =
-    FrameLine(listOf(Segment("╠" + "═".repeat(width - 2) + "╣", Color.Cyan)))
+internal fun middleBorder(width: Int): FrameLine {
+    val innerWidth = (width - 2).coerceAtLeast(0)
+    return FrameLine(listOf(Segment("╠" + "═".repeat(innerWidth) + "╣", Color.Cyan)))
+}
 
-internal fun bottomBorder(width: Int): FrameLine =
-    FrameLine(listOf(Segment("╚" + "═".repeat(width - 2) + "╝", Color.Cyan)))
+internal fun bottomBorder(width: Int): FrameLine {
+    val innerWidth = (width - 2).coerceAtLeast(0)
+    return FrameLine(listOf(Segment("╚" + "═".repeat(innerWidth) + "╝", Color.Cyan)))
+}
 
 internal fun blankLine(width: Int): FrameLine = frameLine(width, emptyList())
 
 internal fun frameLineCentered(width: Int, content: String, color: Color): FrameLine {
-    val innerWidth = width - 2
+    val innerWidth = (width - 2).coerceAtLeast(0)
+    if (innerWidth == 0) return frameLine(width, emptyList())
     val truncated = content.take(innerWidth)
     val padding = ((innerWidth - truncated.length) / 2).coerceAtLeast(0)
+    val rightPadding = (innerWidth - padding - truncated.length).coerceAtLeast(0)
     val centered = buildString {
         append(" ".repeat(padding))
         append(truncated)
-        append(" ".repeat(innerWidth - padding - truncated.length))
+        append(" ".repeat(rightPadding))
     }
     return frameLine(width, listOf(Segment(centered, color)))
 }
