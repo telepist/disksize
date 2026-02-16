@@ -16,6 +16,8 @@ import disksize.domain.usecase.DeleteFileUseCase
 import disksize.domain.usecase.ScanDirectoryUseCase
 import disksize.presentation.ExplorerState
 import disksize.presentation.cancelConfirmDelete
+import disksize.presentation.BrowserItemKind
+import disksize.presentation.findParentIndex
 import disksize.presentation.resetSelection
 import disksize.presentation.startDeleting
 import disksize.presentation.tickSpinner
@@ -28,6 +30,7 @@ import disksize.presentation.withScanResult
 import disksize.presentation.withSelection
 import disksize.presentation.withNextSortOrder
 import disksize.presentation.withProgress
+import disksize.presentation.withToggleExpand
 import disksize.util.normalizePath
 import disksize.util.parentPath
 import kotlinx.coroutines.Dispatchers
@@ -114,15 +117,37 @@ fun DiskSizeApp(
                 state = state.withSelection(bounded)
             }
         },
-        onOpenSelected = {
+        onToggleExpand = {
             val selectedItem = state.browserItems.getOrNull(state.selectedIndex) ?: return@MainScreen
             if (!selectedItem.node.isDirectory) return@MainScreen
-            val selected = selectedItem.node
-            val currentScan = state.scanResult ?: return@MainScreen
-            history = history + state.copy()
-            val childErrors = currentScan.errors.filter { it.path == selected.path || it.path.startsWith("${selected.path}/") }
-            state = explorerStateFromNode(state, selected, childErrors)
-            pendingScan = null
+            state = state.withToggleExpand(selectedItem.node.path)
+        },
+        onExpandOrEnter = {
+            val selectedItem = state.browserItems.getOrNull(state.selectedIndex) ?: return@MainScreen
+            if (!selectedItem.node.isDirectory) return@MainScreen
+            if (selectedItem.isExpanded) {
+                // Already expanded — move to first child
+                val nextIndex = state.selectedIndex + 1
+                if (nextIndex < state.browserItems.size && state.browserItems[nextIndex].depth > selectedItem.depth) {
+                    state = state.withSelection(nextIndex)
+                }
+            } else {
+                state = state.withToggleExpand(selectedItem.node.path)
+            }
+        },
+        onCollapseOrParent = {
+            val selectedItem = state.browserItems.getOrNull(state.selectedIndex) ?: return@MainScreen
+            if (selectedItem.kind == BrowserItemKind.DIRECTORY && selectedItem.isExpanded) {
+                // Collapse this directory
+                state = state.withToggleExpand(selectedItem.node.path)
+            } else {
+                // Jump to parent item in tree
+                val parentIdx = state.findParentIndex(state.selectedIndex)
+                if (parentIdx != null) {
+                    state = state.withSelection(parentIdx)
+                }
+                // If depth 0, do nothing (Backspace handles going up)
+            }
         },
         onNavigateUp = {
             if (history.isNotEmpty()) {

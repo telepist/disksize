@@ -7,6 +7,7 @@ import disksize.domain.model.createFileNode
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ExplorerStateTest {
@@ -529,6 +530,228 @@ class ExplorerStateTest {
         assertEquals(listOf("child2", "child3"), updated.browserItems.map { it.node.name })
         assertEquals(350, updated.totalSize)
         assertEquals(350, updated.childDirectoryTotalSize)
+    }
+
+    // ── Tree view tests ──
+
+    @Test
+    fun `withToggleExpand expands a directory`() {
+        val state = stateWithNestedTree()
+        assertFalse(state.expandedPaths.contains("/root/dirA"))
+
+        val expanded = state.withToggleExpand("/root/dirA")
+
+        assertTrue(expanded.expandedPaths.contains("/root/dirA"))
+        // Should now contain dirA's children in the list
+        val names = expanded.browserItems.map { it.node.name }
+        assertTrue(names.contains("sub1"))
+        assertTrue(names.contains("sub2"))
+    }
+
+    @Test
+    fun `withToggleExpand collapses an expanded directory`() {
+        val state = stateWithNestedTree().withToggleExpand("/root/dirA")
+        assertTrue(state.expandedPaths.contains("/root/dirA"))
+
+        val collapsed = state.withToggleExpand("/root/dirA")
+
+        assertFalse(collapsed.expandedPaths.contains("/root/dirA"))
+        // dirA's children should be gone
+        val names = collapsed.browserItems.map { it.node.name }
+        assertFalse(names.contains("sub1"))
+        assertFalse(names.contains("sub2"))
+    }
+
+    @Test
+    fun `collapsing parent also collapses nested expanded children`() {
+        var state = stateWithNestedTree()
+        state = state.withToggleExpand("/root/dirA")
+        state = state.withToggleExpand("/root/dirA/sub1")
+        assertTrue(state.expandedPaths.contains("/root/dirA"))
+        assertTrue(state.expandedPaths.contains("/root/dirA/sub1"))
+
+        // Collapse parent
+        val collapsed = state.withToggleExpand("/root/dirA")
+
+        assertFalse(collapsed.expandedPaths.contains("/root/dirA"))
+        assertFalse(collapsed.expandedPaths.contains("/root/dirA/sub1"))
+    }
+
+    @Test
+    fun `tree prefix strings are correct for nested items`() {
+        var state = stateWithNestedTree()
+        state = state.withToggleExpand("/root/dirA")
+
+        // Depth 0 items have no prefix
+        val dirA = state.browserItems.first { it.node.name == "dirA" }
+        assertEquals("", dirA.treePrefix)
+        assertEquals(0, dirA.depth)
+
+        // Depth 1 items have tree prefixes
+        val sub1 = state.browserItems.first { it.node.name == "sub1" }
+        assertEquals(1, sub1.depth)
+        assertEquals("├── ", sub1.treePrefix)
+
+        val sub2 = state.browserItems.first { it.node.name == "sub2" }
+        assertEquals(1, sub2.depth)
+        assertEquals("└── ", sub2.treePrefix)
+    }
+
+    @Test
+    fun `tree prefix chaining for deeply nested items`() {
+        // Verify "│   " vs "    " propagation
+        assertEquals("├── ", buildTreePrefix(emptyList(), isLast = false))
+        assertEquals("└── ", buildTreePrefix(emptyList(), isLast = true))
+        assertEquals("├── ", buildTreePrefix(listOf(false), isLast = false))
+        assertEquals("└── ", buildTreePrefix(listOf(false), isLast = true))
+        assertEquals("│   ├── ", buildTreePrefix(listOf(false, false), isLast = false))
+        assertEquals("│   └── ", buildTreePrefix(listOf(false, false), isLast = true))
+        assertEquals("    ├── ", buildTreePrefix(listOf(true, false), isLast = false))
+        assertEquals("    └── ", buildTreePrefix(listOf(true, true), isLast = true))
+    }
+
+    @Test
+    fun `parentTotalSize is set correctly for nested items`() {
+        var state = stateWithNestedTree()
+        state = state.withToggleExpand("/root/dirA")
+
+        // Depth 0: parentTotalSize = sum of root-level directory sizes
+        val dirA = state.browserItems.first { it.node.name == "dirA" }
+        // dirA=300 + dirB=200 = 500
+        assertEquals(500, dirA.parentTotalSize)
+
+        // Depth 1: parentTotalSize = sum of dirA's directory children sizes
+        val sub1 = state.browserItems.first { it.node.name == "sub1" }
+        // sub1=200 + sub2=100 = 300 (these are the dir children under dirA)
+        assertEquals(300, sub1.parentTotalSize)
+    }
+
+    @Test
+    fun `findParentIndex returns correct index`() {
+        var state = stateWithNestedTree()
+        state = state.withToggleExpand("/root/dirA")
+
+        // items: dirA(0), sub1(1), sub2(2), dirB(3), file.txt(4)
+        val names = state.browserItems.map { it.node.name }
+        val dirAIdx = names.indexOf("dirA")
+        val sub1Idx = names.indexOf("sub1")
+        val sub2Idx = names.indexOf("sub2")
+        val dirBIdx = names.indexOf("dirB")
+
+        assertEquals(dirAIdx, state.findParentIndex(sub1Idx))
+        assertEquals(dirAIdx, state.findParentIndex(sub2Idx))
+        assertNull(state.findParentIndex(dirAIdx)) // depth 0 → null
+        assertNull(state.findParentIndex(dirBIdx)) // depth 0 → null
+    }
+
+    @Test
+    fun `sorting rebuilds tree per-level`() {
+        var state = stateWithNestedTree()
+        state = state.withToggleExpand("/root/dirA")
+
+        // Default is SIZE_DESC — sub1(200) before sub2(100) under dirA
+        val sizeOrder = state.browserItems.map { it.node.name }
+        assertEquals("sub1", sizeOrder[1])
+        assertEquals("sub2", sizeOrder[2])
+
+        // Switch to NAME_ASC — sub1 still before sub2 alphabetically
+        state = state.withNextSortOrder()
+        assertEquals(SortOrder.NAME_ASC, state.sortOrder)
+        val nameOrder = state.browserItems.map { it.node.name }
+        // Name asc: dirA, (expanded children: sub1, sub2), dirB, file.txt
+        assertEquals("dirA", nameOrder[0])
+        assertEquals("sub1", nameOrder[1])
+        assertEquals("sub2", nameOrder[2])
+        assertEquals("dirB", nameOrder[3])
+    }
+
+    @Test
+    fun `withItemDeleted cleans expandedPaths`() {
+        var state = stateWithNestedTree()
+        state = state.withToggleExpand("/root/dirA")
+        state = state.withToggleExpand("/root/dirA/sub1")
+        assertTrue(state.expandedPaths.contains("/root/dirA"))
+        assertTrue(state.expandedPaths.contains("/root/dirA/sub1"))
+
+        val updated = state.withItemDeleted("/root/dirA")
+
+        assertFalse(updated.expandedPaths.contains("/root/dirA"))
+        assertFalse(updated.expandedPaths.contains("/root/dirA/sub1"))
+    }
+
+    @Test
+    fun `expandedPaths preserved across withScanResult`() {
+        var state = stateWithNestedTree()
+        state = state.withToggleExpand("/root/dirA")
+        assertTrue(state.expandedPaths.contains("/root/dirA"))
+
+        // Simulate a refresh with same data
+        val refreshedResult = state.scanResult!!
+        val updated = state.withScanResult(refreshedResult)
+
+        assertTrue(updated.expandedPaths.contains("/root/dirA"))
+        // dirA's children should still be visible
+        val names = updated.browserItems.map { it.node.name }
+        assertTrue(names.contains("sub1"))
+    }
+
+    @Test
+    fun `depth 0 items have no tree prefix`() {
+        val state = stateWithNestedTree()
+        for (item in state.browserItems) {
+            assertEquals(0, item.depth)
+            assertEquals("", item.treePrefix)
+        }
+    }
+
+    @Test
+    fun `files have parentTotalSize of 0`() {
+        val state = stateWithNestedTree()
+        val fileItem = state.browserItems.first { it.kind == BrowserItemKind.FILE }
+        assertEquals(0L, fileItem.parentTotalSize)
+    }
+
+    @Test
+    fun `withToggleExpand preserves selection by path`() {
+        var state = stateWithNestedTree()
+        // Select dirB (index 1)
+        state = state.withSelection(1)
+        assertEquals("dirB", state.browserItems[state.selectedIndex].node.name)
+
+        // Expand dirA — dirB should shift but selection should follow it
+        state = state.withToggleExpand("/root/dirA")
+        assertEquals("dirB", state.browserItems[state.selectedIndex].node.name)
+    }
+
+    /**
+     * Helper: creates a state with this structure:
+     * /root
+     *   dirA/ (300 bytes total)
+     *     sub1/ (200 bytes)
+     *       deep.txt (200 bytes)
+     *     sub2/ (100 bytes)
+     *   dirB/ (200 bytes)
+     *   file.txt (50 bytes)
+     */
+    private fun stateWithNestedTree(): ExplorerState {
+        val deep = file("/root/dirA/sub1/deep.txt", "deep.txt", size = 200)
+        val sub1 = directory("/root/dirA/sub1", "sub1", children = listOf(deep))
+        val sub2 = directory("/root/dirA/sub2", "sub2", size = 100)
+        val dirA = directory("/root/dirA", "dirA", children = listOf(sub1, sub2))
+        val dirB = directory("/root/dirB", "dirB", size = 200)
+        val fileTxt = file("/root/file.txt", "file.txt", size = 50)
+        val root = directory("/root", "root", children = listOf(dirA, dirB, fileTxt))
+
+        val scanResult = ScanResult(
+            rootPath = "/root",
+            totalSize = root.totalSize(),
+            fileCount = root.fileCount(),
+            directoryCount = root.directoryCount(),
+            rootNode = root,
+            scanDurationMs = 0,
+            errors = emptyList()
+        )
+        return ExplorerState(currentPath = "/root").withScanResult(scanResult)
     }
 
     private fun collectAllPaths(node: FileNode): Set<String> {

@@ -108,12 +108,11 @@ private fun browserLines(
         add(indicatorLine(width, "↑ ${startIndex} more"))
     }
 
-    val totalDirectorySize = state.childDirectoryTotalSize.coerceAtLeast(1L)
     for (index in startIndex until endIndex) {
         if (lines.size >= capacity) break
         val item = items[index]
         val line = when (item.kind) {
-            BrowserItemKind.DIRECTORY -> directoryLine(width, item, totalDirectorySize, index == state.selectedIndex)
+            BrowserItemKind.DIRECTORY -> directoryLine(width, item, index == state.selectedIndex)
             BrowserItemKind.FILE -> fileLine(width, item, index == state.selectedIndex)
         }
         add(line)
@@ -184,7 +183,7 @@ private fun loadingLines(
     return lines
 }
 
-private fun directoryLine(width: Int, item: BrowserItem, totalParentSize: Long, isSelected: Boolean): FrameLine {
+private fun directoryLine(width: Int, item: BrowserItem, isSelected: Boolean): FrameLine {
     val innerWidth = width - 2
     val selector = if (isSelected) ">" else " "
     val node = item.node
@@ -193,14 +192,21 @@ private fun directoryLine(width: Int, item: BrowserItem, totalParentSize: Long, 
         node.isDirectory -> "${node.name}/"
         else -> node.name
     }
+    val expandIndicator = when {
+        item.isExpanded -> "▾ "
+        node.isDirectory && node.children.isNotEmpty() -> "▸ "
+        else -> "  "
+    }
+    val totalParentSize = item.parentTotalSize
     val size = SizeFormatter.format(item.totalSize)
     val percentage = if (totalParentSize > 0) item.totalSize.toDouble() / totalParentSize * 100 else 0.0
     val percentStr = formatPercentage(percentage)
     val sizePart = "$size (${percentStr}%)"
 
-    val availableForBar = innerWidth - sizePart.length - 4
+    val prefixLen = item.treePrefix.length + expandIndicator.length
+    val availableForBar = innerWidth - sizePart.length - 4 - prefixLen
     val barWidth = max(0, min(PROGRESS_BAR_TARGET, availableForBar / 2))
-    val availableForLabel = (innerWidth - sizePart.length - barWidth - 3).coerceAtLeast(0)
+    val availableForLabel = (innerWidth - sizePart.length - barWidth - 3 - prefixLen).coerceAtLeast(0)
     val labelColor = when {
         isSelected -> Color.Green
         node.isDirectory -> Color.Cyan
@@ -212,9 +218,13 @@ private fun directoryLine(width: Int, item: BrowserItem, totalParentSize: Long, 
         item.totalSize >= 10_000_000 -> Color.Cyan
         else -> Color.White
     }
+    val prefixColor = if (isSelected) Color.Green else Color.Cyan
 
     val segments = mutableListOf<Segment>()
-    val label = truncateWithEllipsis("$selector $nameWithType", availableForLabel)
+    if (item.treePrefix.isNotEmpty()) {
+        segments += Segment(item.treePrefix, prefixColor)
+    }
+    val label = truncateWithEllipsis("$selector $expandIndicator$nameWithType", availableForLabel + expandIndicator.length + 2)
     segments += Segment(label, labelColor)
     segments += Segment(" ")
     segments += Segment(sizePart, sizeColor)
@@ -239,12 +249,19 @@ private fun fileLine(width: Int, item: BrowserItem, isSelected: Boolean): FrameL
         item.totalSize >= 10_000_000 -> Color.Cyan
         else -> Color.White
     }
+    val prefixColor = if (isSelected) Color.Green else Color.Cyan
+    // "  " spacer aligns with the expand indicator on directory lines
+    val spacer = "  "
+    val prefixLen = item.treePrefix.length + spacer.length
 
     val sizePart = size
-    val availableForLabel = (innerWidth - sizePart.length - 3).coerceAtLeast(0)
-    val label = truncateWithEllipsis("$selector $name", availableForLabel)
+    val availableForLabel = (innerWidth - sizePart.length - 3 - prefixLen).coerceAtLeast(0)
 
     val segments = mutableListOf<Segment>()
+    if (item.treePrefix.isNotEmpty()) {
+        segments += Segment(item.treePrefix, prefixColor)
+    }
+    val label = truncateWithEllipsis("$selector $spacer$name", availableForLabel + spacer.length + 2)
     segments += Segment(label, labelColor)
     segments += Segment(" ")
     segments += Segment(sizePart, sizeColor)

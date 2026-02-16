@@ -17,7 +17,9 @@ private const val MIN_ROWS = 16
 fun MainScreen(
     state: ExplorerState,
     onMoveSelection: (Int) -> Unit,
-    onOpenSelected: () -> Unit,
+    onToggleExpand: () -> Unit,
+    onExpandOrEnter: () -> Unit,
+    onCollapseOrParent: () -> Unit,
     onNavigateUp: () -> Unit,
     onCycleSort: () -> Unit,
     onRefresh: () -> Unit,
@@ -40,7 +42,9 @@ fun MainScreen(
                 event = event,
                 state = state,
                 moveSelection = onMoveSelection,
-                openSelected = onOpenSelected,
+                toggleExpand = onToggleExpand,
+                expandOrEnter = onExpandOrEnter,
+                collapseOrParent = onCollapseOrParent,
                 navigateUp = onNavigateUp,
                 cycleSort = onCycleSort,
                 refresh = onRefresh,
@@ -59,7 +63,9 @@ private fun handleKey(
     event: KeyEvent,
     state: ExplorerState,
     moveSelection: (Int) -> Unit,
-    openSelected: () -> Unit,
+    toggleExpand: () -> Unit,
+    expandOrEnter: () -> Unit,
+    collapseOrParent: () -> Unit,
     navigateUp: () -> Unit,
     cycleSort: () -> Unit,
     refresh: () -> Unit,
@@ -94,8 +100,10 @@ private fun handleKey(
     return when (event.key) {
         "ArrowDown", "j" -> { moveSelection(1); true }
         "ArrowUp", "k" -> { moveSelection(-1); true }
-        "Enter", "ArrowRight", "l" -> { openSelected(); true }
-        "Backspace", "ArrowLeft", "h" -> { navigateUp(); true }
+        "Enter" -> { toggleExpand(); true }
+        "ArrowRight", "l" -> { expandOrEnter(); true }
+        "ArrowLeft", "h" -> { collapseOrParent(); true }
+        "Backspace" -> { navigateUp(); true }
         "s", "S" -> { cycleSort(); true }
         "r", "R" -> { refresh(); true }
         "Delete" -> { requestDelete(); true }

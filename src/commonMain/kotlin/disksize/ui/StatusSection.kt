@@ -5,7 +5,7 @@ import disksize.presentation.BrowserItemKind
 import disksize.presentation.ExplorerState
 import disksize.util.SizeFormatter
 
-private const val KEY_HINTS = "  s: Sort  r: Refresh  Del: Delete  q: Quit"
+private const val KEY_HINTS = "  Enter: Expand  s: Sort  r: Refresh  Del: Delete  q: Quit"
 
 internal fun statusLine(state: ExplorerState, width: Int): FrameLine {
     val innerWidth = width - 2
