@@ -13,6 +13,7 @@ import kotlin.math.roundToInt
 
 private const val PROGRESS_BAR_TARGET = 24
 private val DIM_COLOR = Color(100, 100, 100)
+private val SELECTED_BACKGROUND = Color(0, 40, 0)
 
 internal fun directorySection(state: ExplorerState, width: Int, maxRows: Int): List<FrameLine> {
     if (maxRows <= 0) return emptyList()
@@ -248,7 +249,6 @@ private fun directoryLine(width: Int, item: BrowserItem, isSelected: Boolean, sp
     val barWidth = max(0, min(PROGRESS_BAR_TARGET, availableForBar / 2))
     val availableForLabel = (innerWidth - sizePart.length - barWidth - 3 - prefixLen).coerceAtLeast(0)
     val labelColor = when {
-        isSelected -> Color.Green
         isCurrentlyScanning -> Color.Yellow
         !item.isScanned -> DIM_COLOR
         node.isDirectory -> Color.Cyan
@@ -260,11 +260,9 @@ private fun directoryLine(width: Int, item: BrowserItem, isSelected: Boolean, sp
         displaySize >= 10_000_000 -> Color.Cyan
         else -> Color.White
     }
-    val prefixColor = if (isSelected) Color.Green else Color.Cyan
-
     val segments = mutableListOf<Segment>()
     if (item.treePrefix.isNotEmpty()) {
-        segments += Segment(item.treePrefix, prefixColor)
+        segments += Segment(item.treePrefix, Color.Cyan)
     }
     val label = truncateWithEllipsis("$selector $expandIndicator$nameWithType", availableForLabel + expandIndicator.length + 2)
     segments += Segment(label, labelColor)
@@ -275,7 +273,8 @@ private fun directoryLine(width: Int, item: BrowserItem, isSelected: Boolean, sp
         segments += usageBarSegment(barWidth, percentage, isSelected)
     }
 
-    return frameLine(width, segments)
+    val bg = if (isSelected) SELECTED_BACKGROUND else null
+    return frameLine(width, segments, background = bg)
 }
 
 private fun fileLine(width: Int, item: BrowserItem, isSelected: Boolean): FrameLine {
@@ -284,14 +283,13 @@ private fun fileLine(width: Int, item: BrowserItem, isSelected: Boolean): FrameL
     val node = item.node
     val name = if (node.isSymlink) "${node.name}@" else node.name
     val size = SizeFormatter.format(item.totalSize)
-    val labelColor = if (isSelected) Color.Green else Color.White
+    val labelColor = Color.White
     val sizeColor = when {
         item.totalSize >= 1_000_000_000 -> Color.Red
         item.totalSize >= 100_000_000 -> Color.Yellow
         item.totalSize >= 10_000_000 -> Color.Cyan
         else -> Color.White
     }
-    val prefixColor = if (isSelected) Color.Green else Color.Cyan
     // "  " spacer aligns with the expand indicator on directory lines
     val spacer = "  "
     val prefixLen = item.treePrefix.length + spacer.length
@@ -301,14 +299,15 @@ private fun fileLine(width: Int, item: BrowserItem, isSelected: Boolean): FrameL
 
     val segments = mutableListOf<Segment>()
     if (item.treePrefix.isNotEmpty()) {
-        segments += Segment(item.treePrefix, prefixColor)
+        segments += Segment(item.treePrefix, Color.Cyan)
     }
     val label = truncateWithEllipsis("$selector $spacer$name", availableForLabel + spacer.length + 2)
     segments += Segment(label, labelColor)
     segments += Segment(" ")
     segments += Segment(sizePart, sizeColor)
 
-    return frameLine(width, segments)
+    val bg = if (isSelected) SELECTED_BACKGROUND else null
+    return frameLine(width, segments, background = bg)
 }
 
 private fun usageBarSegment(width: Int, percentage: Double, highlight: Boolean): Segment {

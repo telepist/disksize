@@ -5,7 +5,7 @@ import com.jakewharton.mosaic.ui.Color
 import com.jakewharton.mosaic.ui.Row
 import com.jakewharton.mosaic.ui.Text
 
-internal data class Segment(val text: String, val color: Color? = null)
+internal data class Segment(val text: String, val color: Color? = null, val background: Color? = null)
 
 internal data class FrameLine(val segments: List<Segment>)
 
@@ -13,11 +13,11 @@ internal data class FrameLine(val segments: List<Segment>)
 internal fun FrameLineRow(frameLine: FrameLine) {
     Row {
         frameLine.segments.forEach { segment ->
-            if (segment.color != null) {
-                Text(segment.text, color = segment.color)
-            } else {
-                Text(segment.text)
-            }
+            Text(
+                segment.text,
+                color = segment.color ?: Color.Unspecified,
+                background = segment.background ?: Color.Unspecified,
+            )
         }
     }
 }
@@ -58,7 +58,7 @@ internal fun frameLineCentered(width: Int, content: String, color: Color): Frame
     return frameLine(width, listOf(Segment(centered, color)))
 }
 
-internal fun frameLine(width: Int, segments: List<Segment>): FrameLine {
+internal fun frameLine(width: Int, segments: List<Segment>, background: Color? = null): FrameLine {
     val innerWidth = width - 2
     if (innerWidth <= 0) return FrameLine(listOf(Segment("")))
 
@@ -69,21 +69,21 @@ internal fun frameLine(width: Int, segments: List<Segment>): FrameLine {
         val remaining = innerWidth - consumed
         val text = segment.text.take(remaining)
         consumed += text.length
-        trimmed += Segment(text, segment.color)
+        trimmed += Segment(text, segment.color, segment.background ?: background)
     }
 
     if (trimmed.isEmpty()) {
-        trimmed += Segment(" ".repeat(innerWidth))
+        trimmed += Segment(" ".repeat(innerWidth), background = background)
     } else {
         val currentLen = trimmed.sumOf { it.text.length }
         when {
             currentLen < innerWidth -> {
-                trimmed += Segment(" ".repeat(innerWidth - currentLen))
+                trimmed += Segment(" ".repeat(innerWidth - currentLen), background = background)
             }
             currentLen > innerWidth -> {
                 val overflow = currentLen - innerWidth
                 val last = trimmed.removeLast()
-                trimmed += Segment(last.text.dropLast(overflow), last.color)
+                trimmed += Segment(last.text.dropLast(overflow), last.color, last.background)
             }
         }
     }
