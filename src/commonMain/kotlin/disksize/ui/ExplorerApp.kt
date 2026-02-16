@@ -36,12 +36,18 @@ import disksize.util.normalizePath
 import disksize.util.parentPath
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.awaitCancellation
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
-import kotlin.system.exitProcess
+
+/**
+ * HACK: Thrown to exit the Mosaic composition gracefully.
+ * Workaround for https://github.com/JakeWharton/mosaic/issues/963 —
+ * using exitProcess() corrupts terminal state (cursor disappears, raw mode not reset).
+ * Remove once Mosaic supports proper exiting via MosaicScope cancellation.
+ */
+class ExitException : RuntimeException("exit")
 
 @Composable
 fun DiskSizeApp(
@@ -87,6 +93,8 @@ fun DiskSizeApp(
                 }
             }
             null
+        } catch (e: ExitException) {
+            throw e
         } catch (throwable: Throwable) {
             throwable
         }
@@ -201,8 +209,7 @@ fun DiskSizeApp(
             state = state.cancelConfirmDelete()
         },
         onQuit = {
-            scope.cancel()
-            exitProcess(0)
+            throw ExitException()
         }
     )
 }
