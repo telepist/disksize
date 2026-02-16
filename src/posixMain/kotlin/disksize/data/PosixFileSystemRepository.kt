@@ -39,6 +39,38 @@ class PosixFileSystemRepository : FileSystemRepository() {
         }
     }
 
+    override suspend fun listDirectoryChildren(
+        path: String,
+        errors: MutableList<ScanError>
+    ): List<FileNode> {
+        val children = mutableListOf<FileNode>()
+        val dir = opendir(path) ?: throw Exception("Cannot open directory: $path")
+
+        try {
+            while (true) {
+                val entry = readdir(dir) ?: break
+                val name = entry.pointed.d_name.toKString()
+                if (name == "." || name == "..") continue
+
+                val childPath = resolveChildPath(path, name)
+                try {
+                    val childNode = createFileNode(childPath)
+                    children.add(childNode)
+                } catch (e: Exception) {
+                    errors += ScanError(
+                        path = childPath,
+                        message = e.message ?: "Unable to access $childPath",
+                        type = classifyError(e)
+                    )
+                }
+            }
+        } finally {
+            closedir(dir)
+        }
+
+        return children
+    }
+
     override suspend fun scanDirectoryRecursive(
         path: String,
         errors: MutableList<ScanError>,

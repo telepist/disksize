@@ -723,6 +723,213 @@ class ExplorerStateTest {
         assertEquals("dirB", state.browserItems[state.selectedIndex].node.name)
     }
 
+    // ── Progressive scanning tests ──
+
+    @Test
+    fun `withPartialScanResult sets correct flags and preserves expandedPaths`() {
+        var state = stateWithNestedTree()
+        state = state.withToggleExpand("/root/dirA")
+        assertTrue(state.expandedPaths.contains("/root/dirA"))
+
+        // Simulate partial scan result with some paths scanned
+        val scanResult = state.scanResult!!
+        val scannedPaths = setOf("/root/dirA")
+
+        val updated = state.withPartialScanResult(scanResult, scannedPaths)
+
+        assertFalse(updated.isLoading)
+        assertTrue(updated.isScanInProgress)
+        assertEquals(scannedPaths, updated.scannedPaths)
+        assertTrue(updated.expandedPaths.contains("/root/dirA"))
+        // dirA's children should still be visible
+        val names = updated.browserItems.map { it.node.name }
+        assertTrue(names.contains("sub1"))
+    }
+
+    @Test
+    fun `isScanned is false for unscanned depth-0 dirs during scan`() {
+        val scanResult = ScanResult(
+            rootPath = "/root",
+            totalSize = 300,
+            fileCount = 0,
+            directoryCount = 3,
+            rootNode = directory(
+                path = "/root",
+                name = "root",
+                children = listOf(
+                    directory("/root/a", "a", size = 100),
+                    directory("/root/b", "b", size = 100),
+                    directory("/root/c", "c", size = 100)
+                )
+            ),
+            scanDurationMs = 0,
+            errors = emptyList()
+        )
+
+        val state = ExplorerState(currentPath = "/root")
+            .withPartialScanResult(scanResult, scannedPaths = setOf("/root/a"))
+
+        val itemA = state.browserItems.first { it.node.name == "a" }
+        val itemB = state.browserItems.first { it.node.name == "b" }
+        val itemC = state.browserItems.first { it.node.name == "c" }
+
+        assertTrue(itemA.isScanned)
+        assertFalse(itemB.isScanned)
+        assertFalse(itemC.isScanned)
+    }
+
+    @Test
+    fun `isScanned is true for all items when not scanning`() {
+        val state = stateWithNestedTree()
+
+        for (item in state.browserItems) {
+            assertTrue(item.isScanned, "Expected isScanned=true for ${item.node.name}")
+        }
+    }
+
+    @Test
+    fun `withScanResult clears isScanInProgress and scannedPaths`() {
+        val scanResult = ScanResult(
+            rootPath = "/root",
+            totalSize = 100,
+            fileCount = 0,
+            directoryCount = 1,
+            rootNode = directory("/root", "root", children = listOf(
+                directory("/root/a", "a", size = 100)
+            )),
+            scanDurationMs = 0,
+            errors = emptyList()
+        )
+
+        // First set up a partial scan state
+        val partial = ExplorerState(currentPath = "/root")
+            .withPartialScanResult(scanResult, scannedPaths = setOf("/root/a"))
+        assertTrue(partial.isScanInProgress)
+        assertTrue(partial.scannedPaths.isNotEmpty())
+
+        // Now complete the scan
+        val completed = partial.withScanResult(scanResult)
+        assertFalse(completed.isScanInProgress)
+        assertTrue(completed.scannedPaths.isEmpty())
+    }
+
+    @Test
+    fun `withPartialScanResult preserves selection by path`() {
+        val scanResult = ScanResult(
+            rootPath = "/root",
+            totalSize = 300,
+            fileCount = 0,
+            directoryCount = 3,
+            rootNode = directory(
+                path = "/root",
+                name = "root",
+                children = listOf(
+                    directory("/root/a", "a", size = 100),
+                    directory("/root/b", "b", size = 100),
+                    directory("/root/c", "c", size = 100)
+                )
+            ),
+            scanDurationMs = 0,
+            errors = emptyList()
+        )
+
+        // Start with partial result, select "b"
+        var state = ExplorerState(currentPath = "/root")
+            .withPartialScanResult(scanResult, scannedPaths = setOf("/root/a"))
+        val bIndex = state.browserItems.indexOfFirst { it.node.name == "b" }
+        state = state.withSelection(bIndex)
+        assertEquals("b", state.browserItems[state.selectedIndex].node.name)
+
+        // Second partial result — selection should stay on "b"
+        val updated = state.withPartialScanResult(scanResult, scannedPaths = setOf("/root/a", "/root/b"))
+        assertEquals("b", updated.browserItems[updated.selectedIndex].node.name)
+    }
+
+    @Test
+    fun `progressive partial results update sizes correctly`() {
+        val dirA = directory("/root/a", "a", size = 10)  // placeholder, just metadata
+        val dirB = directory("/root/b", "b", size = 10)
+        val fileTxt = file("/root/file.txt", "file.txt", size = 50)
+        val root = directory("/root", "root", children = listOf(dirA, dirB, fileTxt))
+
+        val initialResult = ScanResult(
+            rootPath = "/root",
+            totalSize = root.totalSize(),
+            fileCount = root.fileCount(),
+            directoryCount = root.directoryCount(),
+            rootNode = root,
+            scanDurationMs = 0,
+            errors = emptyList()
+        )
+
+        // Initial partial: only files scanned, dirs are placeholders
+        var state = ExplorerState(currentPath = "/root")
+            .withPartialScanResult(initialResult, scannedPaths = emptySet())
+        assertEquals(70, state.totalSize) // 10 + 10 + 50
+
+        // After scanning dirA (now has real children with 200 bytes total)
+        val scannedDirA = directory("/root/a", "a", size = 10, children = listOf(
+            file("/root/a/big.bin", "big.bin", size = 200)
+        ))
+        val root2 = directory("/root", "root", children = listOf(scannedDirA, dirB, fileTxt))
+        val result2 = ScanResult(
+            rootPath = "/root",
+            totalSize = root2.totalSize(),
+            fileCount = root2.fileCount(),
+            directoryCount = root2.directoryCount(),
+            rootNode = root2,
+            scanDurationMs = 0,
+            errors = emptyList()
+        )
+
+        state = state.withPartialScanResult(result2, scannedPaths = setOf("/root/a"))
+        assertEquals(270, state.totalSize) // 210 + 10 + 50
+
+        // Verify dirA now shows scanned, dirB still unscanned
+        val itemA = state.browserItems.first { it.node.name == "a" }
+        val itemB = state.browserItems.first { it.node.name == "b" }
+        assertTrue(itemA.isScanned)
+        assertFalse(itemB.isScanned)
+    }
+
+    @Test
+    fun `isScanned is true for depth greater than 0 dirs during scan`() {
+        // Expand dirA which is scanned — its children should all be isScanned=true
+        val scanResult = ScanResult(
+            rootPath = "/root",
+            totalSize = 550,
+            fileCount = 1,
+            directoryCount = 4,
+            rootNode = directory(
+                path = "/root",
+                name = "root",
+                children = listOf(
+                    directory("/root/dirA", "dirA", children = listOf(
+                        directory("/root/dirA/sub1", "sub1", size = 200),
+                        directory("/root/dirA/sub2", "sub2", size = 100)
+                    )),
+                    directory("/root/dirB", "dirB", size = 200)
+                )
+            ),
+            scanDurationMs = 0,
+            errors = emptyList()
+        )
+
+        var state = ExplorerState(currentPath = "/root")
+            .withPartialScanResult(scanResult, scannedPaths = setOf("/root/dirA"))
+        state = state.withToggleExpand("/root/dirA")
+
+        // Depth-1 children of scanned dirA should be isScanned=true
+        val sub1 = state.browserItems.first { it.node.name == "sub1" }
+        val sub2 = state.browserItems.first { it.node.name == "sub2" }
+        assertTrue(sub1.isScanned)
+        assertTrue(sub2.isScanned)
+
+        // But dirB at depth 0 is unscanned
+        val dirB = state.browserItems.first { it.node.name == "dirB" }
+        assertFalse(dirB.isScanned)
+    }
+
     /**
      * Helper: creates a state with this structure:
      * /root

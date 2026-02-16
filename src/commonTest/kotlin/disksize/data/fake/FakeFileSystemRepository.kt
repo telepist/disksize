@@ -59,6 +59,35 @@ class FakeFileSystemRepository : FileSystemRepository() {
         return count
     }
 
+    override suspend fun listDirectoryChildren(
+        path: String,
+        errors: MutableList<ScanError>
+    ): List<FileNode> {
+        if (path in inaccessiblePaths) throw Exception("Permission denied: $path")
+        val node = files[path] ?: throw Exception("Directory not found: $path")
+
+        return node.children.mapNotNull { child ->
+            if (child.path in inaccessiblePaths) {
+                errors += ScanError(
+                    path = child.path,
+                    message = "Permission denied",
+                    type = ErrorType.PERMISSION_DENIED
+                )
+                null
+            } else if (child.isDirectory && !child.isSymlink) {
+                // Return placeholder stub for directories
+                child.copy(
+                    children = emptyList(),
+                    cachedTotalSize = child.size,
+                    cachedFileCount = 0,
+                    cachedDirectoryCount = 0
+                )
+            } else {
+                child
+            }
+        }
+    }
+
     override suspend fun scanDirectoryRecursive(
         path: String,
         errors: MutableList<ScanError>,

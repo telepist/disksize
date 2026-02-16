@@ -105,8 +105,8 @@ private fun handleKey(
         "ArrowLeft", "h" -> { collapseOrParent(); true }
         "Backspace" -> { navigateUp(); true }
         "s", "S" -> { cycleSort(); true }
-        "r", "R" -> { refresh(); true }
-        "Delete" -> { requestDelete(); true }
+        "r", "R" -> { if (!state.isScanInProgress) refresh(); true }
+        "Delete" -> { if (!state.isScanInProgress) requestDelete(); true }
         "q", "Q" -> { quit(); true }
         else -> false
     }

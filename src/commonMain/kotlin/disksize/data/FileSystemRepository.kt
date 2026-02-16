@@ -6,6 +6,7 @@ import disksize.domain.model.ScanError
 import disksize.domain.model.ScanProgress
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlin.time.TimeSource
 
 /**
  * Abstract base repository for file system operations.
@@ -42,9 +43,57 @@ abstract class FileSystemRepository {
             batchSize = 100,
             minIntervalMs = 50
         )
-        val node = scanDirectoryRecursive(path, errors, tracker, isRoot = true)
+
+        tracker.startDirectory(rootNode.path, isRoot = true)
+
+        // List immediate children without recursing
+        val immediateChildren = listDirectoryChildren(path, errors)
+
+        // Separate files/symlinks from directories, track files immediately
+        val children = immediateChildren.toMutableList()
+        val scannedPaths = mutableSetOf<String>()
+        val dirIndices = mutableListOf<Int>()
+        var filesInDir = 0
+        var directoriesInDir = 0
+
+        for ((index, child) in children.withIndex()) {
+            if (child.isDirectory && !child.isSymlink) {
+                dirIndices += index
+                directoriesInDir++
+            } else {
+                tracker.onFileProcessed(child.path, child.size)
+                scannedPaths += child.path
+                filesInDir++
+            }
+        }
+
+        // Emit initial partial tree (files resolved, dirs are placeholders)
+        val initialRoot = calculateAggregates(rootNode, children)
+        emit(DirectoryScanUpdate.PartialTree(initialRoot, scannedPaths.toSet(), errors.toList()))
+
+        // Scan each child directory one by one, throttling partial tree emissions
+        val partialClock = TimeSource.Monotonic.markNow()
+        var lastPartialEmitMs = partialClock.elapsedNow().inWholeMilliseconds
+        for ((i, dirIndex) in dirIndices.withIndex()) {
+            val placeholder = children[dirIndex]
+            val scannedChild = scanDirectoryRecursive(placeholder.path, errors, tracker, isRoot = false)
+            children[dirIndex] = scannedChild
+            scannedPaths += placeholder.path
+
+            val now = partialClock.elapsedNow().inWholeMilliseconds
+            val isLast = i == dirIndices.lastIndex
+            if (isLast || now - lastPartialEmitMs >= PARTIAL_TREE_MIN_INTERVAL_MS) {
+                val updatedRoot = calculateAggregates(rootNode, children)
+                emit(DirectoryScanUpdate.PartialTree(updatedRoot, scannedPaths.toSet(), errors.toList()))
+                lastPartialEmitMs = now
+            }
+        }
+
+        // Root directory processing complete
+        tracker.onDirectoryProcessed(rootNode.path, isRoot = true, filesInDir = filesInDir, directoriesInDir = directoriesInDir)
         tracker.onComplete()
-        emit(DirectoryScanUpdate.Complete(DirectoryScanResult(node, errors)))
+        val finalRoot = calculateAggregates(rootNode, children)
+        emit(DirectoryScanUpdate.Complete(DirectoryScanResult(finalRoot, errors)))
     }
 
     /**
@@ -143,6 +192,15 @@ abstract class FileSystemRepository {
     }
 
     /**
+     * List immediate children of a directory without recursing.
+     * Files get real sizes, directories get metadata size with empty children.
+     */
+    protected abstract suspend fun listDirectoryChildren(
+        path: String,
+        errors: MutableList<ScanError>
+    ): List<FileNode>
+
+    /**
      * Recursively scan a directory and build the file tree.
      */
     protected abstract suspend fun scanDirectoryRecursive(
@@ -207,10 +265,18 @@ abstract class FileSystemRepository {
     }
 }
 
+/** Minimum interval between PartialTree emissions to avoid overwhelming the UI. */
+private const val PARTIAL_TREE_MIN_INTERVAL_MS = 200L
+
 private fun containsAny(haystack: String, vararg needles: String): Boolean =
     needles.any { it in haystack }
 
 sealed interface DirectoryScanUpdate {
     data class Progress(val progress: ScanProgress) : DirectoryScanUpdate
+    data class PartialTree(
+        val root: FileNode,
+        val scannedPaths: Set<String>,
+        val errors: List<ScanError>
+    ) : DirectoryScanUpdate
     data class Complete(val result: FileSystemRepository.DirectoryScanResult) : DirectoryScanUpdate
 }

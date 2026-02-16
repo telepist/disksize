@@ -6,11 +6,17 @@ import disksize.presentation.ExplorerState
 import disksize.util.SizeFormatter
 
 private const val KEY_HINTS = "  Enter: Expand  s: Sort  r: Refresh  Del: Delete  q: Quit"
+private const val SCAN_KEY_HINTS = "  Enter: Expand  s: Sort  q: Quit"
+private const val LOADING_KEY_HINTS = "  q: Quit"
 
 internal fun statusLine(state: ExplorerState, width: Int): FrameLine {
     val innerWidth = width - 2
-    val keyHintsLength = KEY_HINTS.length
-    val availableForStatus = innerWidth - keyHintsLength
+    val keyHints = when {
+        state.isLoading -> LOADING_KEY_HINTS
+        state.isScanInProgress -> SCAN_KEY_HINTS
+        else -> KEY_HINTS
+    }
+    val availableForStatus = innerWidth - keyHints.length
 
     val segments = mutableListOf<Segment>()
     when {
@@ -27,6 +33,23 @@ internal fun statusLine(state: ExplorerState, width: Int): FrameLine {
             val pathMaxLength = (availableForStatus - 10 - elapsedText.length).coerceAtLeast(10)
             segments += Segment(elapsedText, Color.Yellow)
             segments += Segment(shortenPath(state.currentPath, pathMaxLength), Color.Cyan)
+        }
+        state.isScanInProgress -> {
+            segments += Segment("Scanning ", Color.Cyan)
+            segments += Segment(state.spinnerFrame.toString(), Color.Yellow)
+
+            val elapsedText = state.scanStartTimeMark?.let { mark ->
+                val elapsedSeconds = mark.elapsedNow().inWholeSeconds
+                " (${elapsedSeconds}s)"
+            } ?: ""
+            segments += Segment(elapsedText, Color.Yellow)
+
+            val progress = state.loadingProgress
+            if (progress != null) {
+                segments += Segment(" F:${formatCount(progress.processedFiles)}", Color.Cyan)
+                segments += Segment(" D:${formatCount(progress.processedDirectories)}", Color.Cyan)
+                segments += Segment(" ${SizeFormatter.format(progress.scannedBytes)}", Color.Green)
+            }
         }
         state.errorMessage != null -> {
             segments += Segment("Error: ${state.errorMessage.take(availableForStatus - 7)}", Color.Red)
@@ -51,6 +74,6 @@ internal fun statusLine(state: ExplorerState, width: Int): FrameLine {
         }
         else -> segments += Segment("Idle", Color.Cyan)
     }
-    segments += Segment(KEY_HINTS, Color.Yellow)
+    segments += Segment(keyHints, Color.Yellow)
     return frameLine(width, segments)
 }

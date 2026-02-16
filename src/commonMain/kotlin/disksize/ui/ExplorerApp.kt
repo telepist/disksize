@@ -26,6 +26,7 @@ import disksize.presentation.withError
 import disksize.presentation.withItemDeleted
 import disksize.presentation.withLoading
 import disksize.presentation.withNodeUpdated
+import disksize.presentation.withPartialScanResult
 import disksize.presentation.withScanResult
 import disksize.presentation.withSelection
 import disksize.presentation.withNextSortOrder
@@ -73,6 +74,9 @@ fun DiskSizeApp(
                     is ScanStatus.Progress -> {
                         state = state.withProgress(update.value)
                     }
+                    is ScanStatus.PartialResult -> {
+                        state = state.withPartialScanResult(update.result, update.scannedPaths)
+                    }
                     is ScanStatus.Completed -> {
                         state = state.withScanResult(update.result).resetSelection()
                         // Update history if this is a refresh to keep parent cache in sync
@@ -97,11 +101,11 @@ fun DiskSizeApp(
         }
     }
 
-    LaunchedEffect(state.isLoading, state.isDeletingInProgress, pendingScan) {
-        if (!state.isLoading && !state.isDeletingInProgress) return@LaunchedEffect
+    LaunchedEffect(state.isLoading, state.isScanInProgress, state.isDeletingInProgress, pendingScan) {
+        if (!state.isLoading && !state.isScanInProgress && !state.isDeletingInProgress) return@LaunchedEffect
         while (true) {
             delay(120)
-            if (!state.isLoading && !state.isDeletingInProgress) break
+            if (!state.isLoading && !state.isScanInProgress && !state.isDeletingInProgress) break
             state = state.tickSpinner()
         }
     }
@@ -120,11 +124,13 @@ fun DiskSizeApp(
         onToggleExpand = {
             val selectedItem = state.browserItems.getOrNull(state.selectedIndex) ?: return@MainScreen
             if (!selectedItem.node.isDirectory) return@MainScreen
+            if (!selectedItem.isScanned) return@MainScreen
             state = state.withToggleExpand(selectedItem.node.path)
         },
         onExpandOrEnter = {
             val selectedItem = state.browserItems.getOrNull(state.selectedIndex) ?: return@MainScreen
             if (!selectedItem.node.isDirectory) return@MainScreen
+            if (!selectedItem.isScanned) return@MainScreen
             if (selectedItem.isExpanded) {
                 // Already expanded — move to first child
                 val nextIndex = state.selectedIndex + 1
@@ -164,13 +170,17 @@ fun DiskSizeApp(
             state = state.withNextSortOrder()
         },
         onRefresh = {
-            // Trigger a rescan of the current directory
-            pendingScan = state.currentPath
-            // History will be preserved and updated to reflect new scan results
+            if (!state.isScanInProgress) {
+                // Trigger a rescan of the current directory
+                pendingScan = state.currentPath
+                // History will be preserved and updated to reflect new scan results
+            }
         },
         onRequestDelete = {
-            val selectedItem = state.browserItems.getOrNull(state.selectedIndex) ?: return@MainScreen
-            state = state.withConfirmDelete(selectedItem)
+            if (!state.isScanInProgress) {
+                val selectedItem = state.browserItems.getOrNull(state.selectedIndex) ?: return@MainScreen
+                state = state.withConfirmDelete(selectedItem)
+            }
         },
         onConfirmDelete = {
             val itemToDelete = state.confirmDeleteItem ?: return@MainScreen

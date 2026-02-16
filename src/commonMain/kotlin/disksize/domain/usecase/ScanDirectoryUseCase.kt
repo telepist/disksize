@@ -20,6 +20,23 @@ class ScanDirectoryUseCase(
         repository.scanDirectory(path).collect { update ->
             when (update) {
                 is DirectoryScanUpdate.Progress -> emit(ScanStatus.Progress(update.progress))
+                is DirectoryScanUpdate.PartialTree -> {
+                    val rootNode = update.root
+
+                    currentCoroutineContext().ensureActive()
+
+                    val duration = startTime.elapsedNow().inWholeMilliseconds
+                    val result = ScanResult(
+                        rootPath = path,
+                        totalSize = rootNode.totalSize(),
+                        fileCount = rootNode.fileCount(),
+                        directoryCount = rootNode.directoryCount(),
+                        rootNode = rootNode,
+                        scanDurationMs = duration,
+                        errors = update.errors
+                    )
+                    emit(ScanStatus.PartialResult(result, update.scannedPaths))
+                }
                 is DirectoryScanUpdate.Complete -> {
                     val rootNode = update.result.root
                     val repoErrors = update.result.errors

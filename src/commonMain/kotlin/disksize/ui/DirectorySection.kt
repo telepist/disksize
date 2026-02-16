@@ -11,6 +11,7 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 private const val PROGRESS_BAR_TARGET = 24
+private val DIM_COLOR = Color(100, 100, 100)
 
 internal fun directorySection(state: ExplorerState, width: Int, maxRows: Int): List<FrameLine> {
     if (maxRows <= 0) return emptyList()
@@ -25,7 +26,11 @@ internal fun directorySection(state: ExplorerState, width: Int, maxRows: Int): L
         }
     }
 
-    add(frameLine(width, listOf(Segment("Entries (Sort: ${state.sortOrder.label})", Color.Cyan))))
+    val headerSegments = mutableListOf(Segment("Entries (Sort: ${state.sortOrder.label})", Color.Cyan))
+    if (state.isScanInProgress) {
+        headerSegments += Segment(" │ Scanning ${state.spinnerFrame}", Color.Yellow)
+    }
+    add(frameLine(width, headerSegments))
     if (remainingCapacity() <= 0) return lines
 
     when {
@@ -193,6 +198,7 @@ private fun directoryLine(width: Int, item: BrowserItem, isSelected: Boolean): F
         else -> node.name
     }
     val expandIndicator = when {
+        !item.isScanned -> "⋯ "
         item.isExpanded -> "▾ "
         node.isDirectory && node.children.isNotEmpty() -> "▸ "
         else -> "  "
@@ -208,6 +214,7 @@ private fun directoryLine(width: Int, item: BrowserItem, isSelected: Boolean): F
     val barWidth = max(0, min(PROGRESS_BAR_TARGET, availableForBar / 2))
     val availableForLabel = (innerWidth - sizePart.length - barWidth - 3 - prefixLen).coerceAtLeast(0)
     val labelColor = when {
+        !item.isScanned -> DIM_COLOR
         isSelected -> Color.Green
         node.isDirectory -> Color.Cyan
         else -> Color.White
@@ -285,7 +292,7 @@ private fun usageBarSegment(width: Int, percentage: Double, highlight: Boolean):
 private fun indicatorLine(width: Int, message: String): FrameLine =
     frameLine(width, listOf(Segment(message, Color.Cyan)))
 
-private fun formatCount(count: Int): String = when {
+internal fun formatCount(count: Int): String = when {
     count >= 1_000_000 -> "${(count / 100_000) / 10.0}M"
     count >= 1_000 -> "${(count / 100) / 10.0}K"
     else -> count.toString()

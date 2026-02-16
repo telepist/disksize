@@ -22,6 +22,46 @@ class WindowsFileSystemRepository : FileSystemRepository() {
         }
     }
 
+    override suspend fun listDirectoryChildren(
+        path: String,
+        errors: MutableList<ScanError>
+    ): List<FileNode> {
+        val children = mutableListOf<FileNode>()
+        val searchPath = WindowsPathUtils.toSearchPath(path)
+
+        memScoped {
+            val findData = alloc<WIN32_FIND_DATAW>()
+            val handle = FindFirstFileW(searchPath, findData.ptr)
+
+            if (handle == INVALID_HANDLE_VALUE) {
+                throw Exception("Cannot open directory: $path")
+            }
+
+            try {
+                do {
+                    val name = findData.cFileName.toKString()
+                    if (name == "." || name == "..") continue
+
+                    val childPath = WindowsPathUtils.joinPath(path, name)
+                    try {
+                        val childNode = createFileNode(childPath)
+                        children.add(childNode)
+                    } catch (e: Exception) {
+                        errors += ScanError(
+                            path = childPath,
+                            message = e.message ?: "Unable to access $childPath",
+                            type = classifyError(e)
+                        )
+                    }
+                } while (FindNextFileW(handle, findData.ptr) != 0)
+            } finally {
+                FindClose(handle)
+            }
+        }
+
+        return children
+    }
+
     override suspend fun scanDirectoryRecursive(
         path: String,
         errors: MutableList<ScanError>,

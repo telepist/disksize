@@ -8,6 +8,13 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 private class TestFileSystemRepository : FileSystemRepository() {
+    override suspend fun listDirectoryChildren(
+        path: String,
+        errors: MutableList<ScanError>
+    ): List<FileNode> {
+        throw UnsupportedOperationException("Not used in tests")
+    }
+
     override suspend fun scanDirectoryRecursive(
         path: String,
         errors: MutableList<ScanError>,
