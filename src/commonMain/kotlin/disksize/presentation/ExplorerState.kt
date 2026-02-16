@@ -73,18 +73,10 @@ fun ExplorerState.withScanResult(scanResult: ScanResult): ExplorerState {
 
 fun ExplorerState.withPartialScanResult(scanResult: ScanResult, scannedPaths: Set<String>): ExplorerState {
     val previousSelectedPath = browserItems.getOrNull(selectedIndex)?.node?.path
-
-    // On the first partial result, build + sort normally.
-    // On subsequent ones, update existing items in-place to avoid re-sorting
-    // which causes the viewport to jump when sizes change dramatically.
-    val items = if (browserItems.isEmpty()) {
-        buildBrowserItems(
-            scanResult.rootNode, sortOrder, expandedPaths,
-            isScanInProgress = true, scannedPaths = scannedPaths
-        )
-    } else {
-        updateBrowserItemsInPlace(scanResult.rootNode, browserItems, expandedPaths, scannedPaths)
-    }
+    val items = buildBrowserItems(
+        scanResult.rootNode, sortOrder, expandedPaths,
+        isScanInProgress = true, scannedPaths = scannedPaths
+    )
 
     val totalChildSize = childDirectoryTotalSize(items)
     val updated = copy(
@@ -343,39 +335,6 @@ enum class BrowserItemKind { DIRECTORY, FILE }
 
 private fun childDirectoryTotalSize(items: List<BrowserItem>): Long {
     return items.filter { it.kind == BrowserItemKind.DIRECTORY && it.depth == 0 }.sumOf(BrowserItem::totalSize)
-}
-
-/**
- * Update existing browser items in-place with new tree data, preserving their order.
- * Only depth-0 items get updated (sizes, isScanned flags). Depth > 0 items are inside
- * already-scanned subtrees and don't change between partial updates.
- */
-private fun updateBrowserItemsInPlace(
-    root: FileNode,
-    currentItems: List<BrowserItem>,
-    expandedPaths: Set<String>,
-    scannedPaths: Set<String>
-): List<BrowserItem> {
-    val childMap = root.children.associateBy { it.path }
-    val parentDirSize = root.children.filter(FileNode::isDirectory).sumOf { it.totalSize() }
-
-    return currentItems.map { item ->
-        if (item.depth == 0) {
-            val updatedNode = childMap[item.node.path] ?: return@map item
-            val isScanned = when {
-                item.kind != BrowserItemKind.DIRECTORY -> true
-                else -> item.node.path in scannedPaths
-            }
-            item.copy(
-                node = updatedNode,
-                totalSize = updatedNode.totalSize(),
-                parentTotalSize = if (item.kind == BrowserItemKind.DIRECTORY) parentDirSize else 0L,
-                isScanned = isScanned
-            )
-        } else {
-            item
-        }
-    }
 }
 
 private fun buildBrowserItems(
