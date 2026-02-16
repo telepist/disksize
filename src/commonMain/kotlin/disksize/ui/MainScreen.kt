@@ -36,11 +36,16 @@ fun MainScreen(
         buildScreenLines(state, frameWidth, frameRows)
     }
 
+    // Page size = approximate visible item rows in the directory listing area.
+    // Header overhead (9 lines) + status footer (3 lines) + directory section header (1 line) + 1 = 14
+    val pageSize = max(1, frameRows - 14)
+
     Column(
         modifier = Modifier.onKeyEvent { event ->
             handleKey(
                 event = event,
                 state = state,
+                pageSize = pageSize,
                 moveSelection = onMoveSelection,
                 toggleExpand = onToggleExpand,
                 expandOrEnter = onExpandOrEnter,
@@ -62,6 +67,7 @@ fun MainScreen(
 private fun handleKey(
     event: KeyEvent,
     state: ExplorerState,
+    pageSize: Int,
     moveSelection: (Int) -> Unit,
     toggleExpand: () -> Unit,
     expandOrEnter: () -> Unit,
@@ -100,6 +106,10 @@ private fun handleKey(
     return when (event.key) {
         "ArrowDown", "j" -> { moveSelection(1); true }
         "ArrowUp", "k" -> { moveSelection(-1); true }
+        "PageDown" -> { moveSelection(pageSize); true }
+        "PageUp" -> { moveSelection(-pageSize); true }
+        "Home" -> { moveSelection(-state.browserItems.size); true }
+        "End" -> { moveSelection(state.browserItems.size); true }
         "Enter" -> { toggleExpand(); true }
         "ArrowRight", "l" -> { expandOrEnter(); true }
         "ArrowLeft", "h" -> { collapseOrParent(); true }
