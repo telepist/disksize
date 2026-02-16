@@ -22,7 +22,7 @@ class FrameFormattingTest {
     @Test
     fun `determinateProgressSegment renders expected fill`() {
         val segment = determinateProgressSegment(fraction = 0.5, width = 12)
-        assertEquals("[█████░░░░░]", segment.text)
+        assertEquals("[█████     ]", segment.text)
         assertTrue(segment.text.length == 12)
     }
 }

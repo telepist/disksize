@@ -1,6 +1,5 @@
 package disksize.ui
 
-import com.jakewharton.mosaic.ui.Color
 import kotlin.math.round
 import kotlin.math.roundToInt
 
@@ -27,9 +26,9 @@ internal fun determinateProgressSegment(fraction: Double, width: Int): Segment {
     val filled = (clamped * inner).roundToInt().coerceIn(0, inner)
     val text = buildString {
         append('[')
-        repeat(filled) { append('█') }
-        repeat(inner - filled) { append('░') }
+        repeat(filled) { append('\u2588') }  // █
+        repeat(inner - filled) { append(' ') }
         append(']')
     }
-    return Segment(text, Color.Green)
+    return Segment(text, Theme.barFilled, Theme.barEmpty)
 }

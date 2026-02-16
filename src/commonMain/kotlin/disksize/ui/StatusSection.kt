@@ -1,71 +1,105 @@
 package disksize.ui
 
-import com.jakewharton.mosaic.ui.Color
 import disksize.presentation.ExplorerState
 import disksize.util.SizeFormatter
 
-private const val KEY_HINTS = "  Enter: Expand  s: Sort  r: Refresh  Del: Delete  q: Quit"
-private const val SCAN_KEY_HINTS = "  Enter: Expand  s: Sort  q: Quit"
-private const val LOADING_KEY_HINTS = "  q: Quit"
-
 internal fun statusLine(state: ExplorerState, width: Int): FrameLine {
-    val innerWidth = width - 2
-    val keyHints = when {
-        state.isLoading -> LOADING_KEY_HINTS
-        state.isScanInProgress -> SCAN_KEY_HINTS
-        else -> KEY_HINTS
-    }
-    val availableForStatus = innerWidth - keyHints.length
+    val innerWidth = width - 1
 
-    val segments = mutableListOf<Segment>()
+    val leftSegments = mutableListOf<Segment>()
+    val rightSegments = mutableListOf<Segment>()
+
+    // Left side: status
     when {
         state.isLoading -> {
-            segments += Segment("Scanning ", Color.Cyan)
-            segments += Segment(state.spinnerFrame.toString(), Color.Yellow)
-
-            // Calculate elapsed time
+            leftSegments += Segment("Scanning ", Theme.title)
+            leftSegments += Segment(state.spinnerFrame.toString(), Theme.spinner)
             val elapsedText = state.scanStartTimeMark?.let { mark ->
                 val elapsedSeconds = mark.elapsedNow().inWholeSeconds
-                " (${elapsedSeconds}s) "
-            } ?: " "
-
-            val pathMaxLength = (availableForStatus - 10 - elapsedText.length).coerceAtLeast(10)
-            segments += Segment(elapsedText, Color.Yellow)
-            segments += Segment(shortenPath(state.currentPath, pathMaxLength), Color.Cyan)
-        }
-        state.isScanInProgress -> {
-            segments += Segment("Scanning ", Color.Cyan)
-            segments += Segment(state.spinnerFrame.toString(), Color.Yellow)
-
-            val elapsedText = state.scanStartTimeMark?.let { mark ->
-                val elapsedSeconds = mark.elapsedNow().inWholeSeconds
-                " (${elapsedSeconds}s)"
+                " ${elapsedSeconds}s"
             } ?: ""
-            segments += Segment(elapsedText, Color.Yellow)
-
+            leftSegments += Segment(elapsedText, Theme.spinner)
             val progress = state.loadingProgress
             if (progress != null) {
-                segments += Segment(" Files:${formatCount(progress.processedFiles)}", Color.Cyan)
-                segments += Segment(" Dirs:${formatCount(progress.processedDirectories)}", Color.Cyan)
-                segments += Segment(" ${SizeFormatter.format(progress.scannedBytes)}", Color.Green)
+                leftSegments += Segment(" Files:${formatCount(progress.processedFiles)}", Theme.keyHint)
+                leftSegments += Segment(" ${SizeFormatter.format(progress.scannedBytes)}", Theme.pathText)
+            }
+        }
+        state.isScanInProgress -> {
+            leftSegments += Segment("Scanning ", Theme.title)
+            leftSegments += Segment(state.spinnerFrame.toString(), Theme.spinner)
+            val elapsedText = state.scanStartTimeMark?.let { mark ->
+                val elapsedSeconds = mark.elapsedNow().inWholeSeconds
+                " ${elapsedSeconds}s"
+            } ?: ""
+            leftSegments += Segment(elapsedText, Theme.spinner)
+            val progress = state.loadingProgress
+            if (progress != null) {
+                leftSegments += Segment(" Files:${formatCount(progress.processedFiles)}", Theme.keyHint)
+                leftSegments += Segment(" ${SizeFormatter.format(progress.scannedBytes)}", Theme.pathText)
             }
         }
         state.errorMessage != null -> {
-            segments += Segment("Error: ${state.errorMessage.take(availableForStatus - 7)}", Color.Red)
+            leftSegments += Segment("Error: ${state.errorMessage.take(innerWidth / 2)}", Theme.statusError)
         }
         state.scanResult != null -> {
             val seconds = state.scanDurationMs / 1000.0
-            val base = "Scan completed in ${formatDuration(seconds)}s"
-            segments += Segment(base, Color.Green)
+            leftSegments += Segment("\u2713 ", Theme.statusSuccess)  // ✓
+            leftSegments += Segment("${formatDuration(seconds)}s", Theme.statusSuccess)
             if (state.warningCount > 0) {
-                segments += Segment(" • ${state.warningCount} warning(s)", Color.Yellow)
+                leftSegments += Segment(" \u00B7 ", Theme.separator)  // ·
+                leftSegments += Segment("${state.warningCount} warnings", Theme.statusWarning)
             }
         }
-        else -> segments += Segment("Idle", Color.Cyan)
+        else -> leftSegments += Segment("Idle", Theme.keyHint)
     }
-    val statusLength = segments.sumOf { it.text.length }
-    val padding = (innerWidth - statusLength - keyHints.length).coerceAtLeast(1)
-    segments += Segment(" ".repeat(padding))
-    segments += Segment(keyHints, Color.Yellow)
-    return frameLine(width, segments)
+
+    // Right side: key hints
+    when {
+        state.isLoading -> {
+            rightSegments += keyHint("q", "Quit")
+        }
+        state.isScanInProgress -> {
+            rightSegments += keyHint("\u2191\u2193", "Navigate")  // ↑↓
+            rightSegments += Segment("  ")
+            rightSegments += keyHint("Enter", "Open")
+            rightSegments += Segment("  ")
+            rightSegments += keyHint("s", "Sort")
+            rightSegments += Segment("  ")
+            rightSegments += keyHint("q", "Quit")
+        }
+        else -> {
+            rightSegments += keyHint("\u2191\u2193", "Navigate")  // ↑↓
+            rightSegments += Segment("  ")
+            rightSegments += keyHint("Enter", "Open")
+            rightSegments += Segment("  ")
+            rightSegments += keyHint("s", "Sort")
+            rightSegments += Segment("  ")
+            rightSegments += keyHint("r", "Refresh")
+            rightSegments += Segment("  ")
+            rightSegments += keyHint("Del", "Delete")
+            rightSegments += Segment("  ")
+            rightSegments += keyHint("q", "Quit")
+        }
+    }
+
+    val leftLen = leftSegments.sumOf { it.text.length }
+    val rightLen = rightSegments.sumOf { it.text.length }
+    val padding = (innerWidth - leftLen - rightLen).coerceAtLeast(1)
+
+    val allSegments = mutableListOf<Segment>()
+    allSegments.addAll(leftSegments)
+    allSegments += Segment(" ".repeat(padding))
+    allSegments.addAll(rightSegments)
+
+    return frameLine(width, allSegments)
+}
+
+private fun keyHint(key: String, desc: String): List<Segment> = listOf(
+    Segment(key, Theme.keyLabel),
+    Segment(" $desc", Theme.keyHint)
+)
+
+private operator fun MutableList<Segment>.plusAssign(segments: List<Segment>) {
+    addAll(segments)
 }

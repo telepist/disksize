@@ -37,8 +37,8 @@ fun MainScreen(
     }
 
     // Page size = approximate visible item rows in the directory listing area.
-    // Header overhead (9 lines) + status footer (3 lines) + directory section header (1 line) + 1 = 14
-    val pageSize = max(1, frameRows - 14)
+    // Overhead: header 1 + stats 1 + rule 1 + rule 1 + status 1 = 5, plus 1 margin = 6
+    val pageSize = max(1, frameRows - 6)
 
     Column(
         modifier = Modifier.onKeyEvent { event ->

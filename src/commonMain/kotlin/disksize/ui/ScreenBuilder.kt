@@ -1,6 +1,5 @@
 package disksize.ui
 
-import com.jakewharton.mosaic.ui.Color
 import disksize.presentation.ExplorerState
 
 internal fun buildScreenLines(state: ExplorerState, width: Int, rows: Int): List<FrameLine> {
@@ -15,29 +14,21 @@ internal fun buildScreenLines(state: ExplorerState, width: Int, rows: Int): List
     }
 
     val lines = mutableListOf<FrameLine>()
-    lines += topBorder(width)
-    lines += headerTitleLine(width)
-    lines += middleBorder(width)
-    lines += pathLine(state, width)
-    lines += blankLine(width)
-    lines += statsSection(state, width)
-    lines += blankLine(width)
+    lines += headerLine(state, width)        // 1 line
+    lines += statsLine(state, width)         // 1 line
+    lines += horizontalRule(width)           // 1 line
 
-    val reservedForStatus = 3  // middleBorder + statusLine + bottomBorder
+    val reservedForFooter = 2  // horizontalRule + statusLine
     val targetVisibleRows = (rows - 1).coerceAtLeast(0)
-    val spaceForDirectory = (targetVisibleRows - lines.size - reservedForStatus).coerceAtLeast(0)
+    val spaceForDirectory = (targetVisibleRows - lines.size - reservedForFooter).coerceAtLeast(0)
     lines += directorySection(state, width, spaceForDirectory)
 
-    val fillerCount = targetVisibleRows - (lines.size + reservedForStatus)
+    val fillerCount = targetVisibleRows - (lines.size + reservedForFooter)
     if (fillerCount > 0) {
         repeat(fillerCount) { lines += blankLine(width) }
     }
 
-    lines += middleBorder(width)
-    lines += statusLine(state, width)
-    lines += bottomBorder(width)
+    lines += horizontalRule(width)           // 1 line
+    lines += statusLine(state, width)        // 1 line
     return lines
 }
-
-private fun headerTitleLine(width: Int): FrameLine =
-    frameLineCentered(width, "DiskSize - Disk Space Analyzer", Color.Cyan)
