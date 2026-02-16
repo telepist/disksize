@@ -8,52 +8,62 @@
 
 ## User Interface Overview
 
-### Layout Structure (MVP 1)
+### Screen Layout
+The screen is built from these sections, top to bottom:
+
 ```
-╔═════════════════════════════════════════════════════════════╗
-║ DiskSize - Disk Space Analyzer                              ║
-╠═════════════════════════════════════════════════════════════╣
-║ Path: /Users/username/Documents                             ║
-╠═════════════════════════════════════════════════════════════╣
-║                                                             ║
-║  Total Size: 15.2 GB                                        ║
-║  Files: 1,234                                               ║
-║  Directories: 156                                           ║
-║                                                             ║
-║  Subdirectories:                                            ║
-║  ┌───────────────────────────────────────────────────────┐  ║
-║  │ Projects/          8.5 GB  (55.9%) ████████████       │  ║
-║  │ Photos/            4.2 GB  (27.6%) ██████             │  ║
-║  │ Documents/         1.8 GB  (11.8%) ███                │  ║
-║  │ Downloads/         650 MB  ( 4.2%) █                  │  ║
-║  │ Music/              70 MB  ( 0.5%)                    │  ║
-║  └───────────────────────────────────────────────────────┘  ║
-║                                                             ║
-╠═════════════════════════════════════════════════════════════╣
-║ [Scanning completed in 2.3s]                      q: Quit   ║
-╚═════════════════════════════════════════════════════════════╝
+╔═══════════════════════════════════════════════════════════════════════════════════╗  ← Top border
+║                          DiskSize - Disk Space Analyzer                           ║  ← Centered title
+╠═══════════════════════════════════════════════════════════════════════════════════╣  ← Separator
+║Path: /Users/username/Documents                                                    ║  ← Path line
+║                                                                                   ║  ← Blank
+║Total Size: 15.2 GB                                                                ║  ← Stats section
+║Files: 1,234                                                                       ║     (3 lines)
+║Directories: 156                                                                   ║
+║                                                                                   ║  ← Blank
+║Entries (Sort: Size ↓)                                                             ║  ← Entry list header
+║> ▾ Projects/                               8.5 GB (55.9%) ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░║  ← Selected + expanded
+║  ├── ▸ my-app/                             3.2 GB (37.6%) ▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░░║  ← Tree children
+║  ├── ▸ website/                            2.1 GB (24.7%) ▓▓▓▓▓▓░░░░░░░░░░░░░░░░░░║            
+║  └── ▸ scripts/                            890 MB (10.5%) ▓▓▓░░░░░░░░░░░░░░░░░░░░░║
+║  ▸ Photos/                                 4.2 GB (27.6%) ▓▓▓▓▓▓▓░░░░░░░░░░░░░░░░░║  ← Collapsed dirs
+║  ▸ Documents/                              1.8 GB (11.8%) ▓▓▓░░░░░░░░░░░░░░░░░░░░░║
+║  ▸ Downloads/                              650 MB (4.3%)  ▓░░░░░░░░░░░░░░░░░░░░░░░║
+║    Music/                                   70 MB (0.5%)                          ║  ← Dir with no children
+║    README.md                                        12 KB                         ║  ← File
+║                                                                                   ║  ← Filler
+╠═══════════════════════════════════════════════════════════════════════════════════╣  ← Separator
+║Scan completed in 2.3s     Enter: Expand  s: Sort  r: Refresh  Del: Delete  q: Quit║  ← Status + key hints
+╚═══════════════════════════════════════════════════════════════════════════════════╝  ← Bottom border
 ```
 
-### Layout Structure (MVP 2 - Interactive)
+### Entry Indicators
+- `>` marks the currently selected entry (highlighted with green background)
+- `▾` expanded directory (Enter to collapse)
+- `▸` collapsed directory with children (Enter to expand)
+- `⋯` directory not yet scanned
+- Spinner (`|`, `/`, `-`, `\`) for directory currently being scanned
+- Tree connectors `├──`, `└──`, `│` show hierarchy under expanded directories
+- Usage bars: `▓` filled (magenta), `█` filled when selected (green), `░` empty
+
+### Scanning View
+While the initial scan is in progress, the entry list area shows live progress:
+
 ```
-╔═════════════════════════════════════════════════════════════╗
-║ DiskSize v0.2.0                              [Sort: Size ▼] ║
-╠═════════════════════════════════════════════════════════════╣
-║ /Users/username/Documents/Projects                          ║
-╠═════════════════════════════════════════════════════════════╣
-║                                                             ║
-║  📁 my-app/              3.2 GB  (37.6%) █████████      ◄  ║
-║  📁 website/             2.1 GB  (24.7%) ██████            ║
-║  📁 scripts/             890 MB  (10.2%) ███               ║
-║  📁 archived/            1.8 GB  (21.2%) █████             ║
-║  📁 experiments/         520 MB  ( 6.1%) ██                ║
-║  📄 README.md             12 KB  ( 0.0%)                   ║
-║                                                             ║
-║                                                             ║
-║                                                             ║
-╠═════════════════════════════════════════════════════════════╣
-║ Total: 8.5 GB | 2,345 files    ↑↓:Nav Enter:Open Bsp:Back   ║
-╚═════════════════════════════════════════════════════════════╝
+║Entries (Sort: Size ↓)                                        ║
+║Scanning / /Users/username/Documents                          ║
+║Files: 1,234  Dirs: 42  Size: 2.4 GB                          ║
+║Rate: 125 MB/s                                                ║
+║Current: /Users/username/Documents/Projects/node_modules      ║
+```
+
+### Scroll Indicators
+When the entry list is longer than the visible area, scroll indicators appear:
+
+```
+║↑ 3 more                                                      ║
+║  ...visible entries...                                       ║
+║↓ 12 more                                                     ║
 ```
 
 ## Color Scheme
@@ -76,7 +86,8 @@
 
 ## Typography & Icons
 
-### File Type Icons (MVP 3)
+### File Type Icons (Planned)
+Not yet implemented. Currently, directories are indicated with a `/` suffix and symlinks with `@`. Planned icons:
 - 📁 Directory
 - 📄 Regular file
 - 🖼️  Image files
@@ -97,24 +108,25 @@ Always use 1024-based units (binary), show one decimal place for GB/TB.
 
 ## User Interactions
 
-### MVP 1 - Static Display
-| Action | Key | Description |
-|--------|-----|-------------|
-| Quit | `q` | Exit application |
-
-### MVP 2 - Interactive Navigation
+### Current - Interactive Navigation
 | Action | Key | Description |
 |--------|-----|-------------|
 | Move Up | `↑` or `k` | Select previous item |
 | Move Down | `↓` or `j` | Select next item |
-| Enter Directory | `Enter` or `→` or `l` | Navigate into selected directory |
-| Go Up One Level | `Backspace` or `←` or `h` | Navigate to parent directory |
+| Page Up | `Page Up` | Move selection up by one page |
+| Page Down | `Page Down` | Move selection down by one page |
+| Jump to Top | `Home` | Jump to the first entry |
+| Jump to Bottom | `End` | Jump to the last entry |
+| Toggle Expand | `Enter` | Expand/collapse selected directory |
+| Expand/Enter | `→` or `l` | Expand directory or enter if already expanded |
+| Collapse/Parent | `←` or `h` | Collapse directory or go to parent |
+| Go Up One Level | `Backspace` | Navigate to parent directory |
 | Sort Toggle | `s` | Cycle sort options (Size ↓ → Name ↑ → Date ↓) |
 | Refresh | `r` | Rescan current directory and subdirectories |
 | Delete | `Delete` | Delete selected file or directory |
 | Quit | `q` | Exit application |
 
-### MVP 3 - Advanced Features
+### Planned - Advanced Features
 | Action | Key | Description |
 |--------|-----|-------------|
 | Search | `/` | Enter search mode |
@@ -125,58 +137,48 @@ Always use 1024-based units (binary), show one decimal place for GB/TB.
 
 ## User Flow
 
-### Primary Flow (MVP 1)
-1. User launches application with optional directory argument
-2. Application scans directory (shows progress)
-3. Results displayed with sorted subdirectories
-4. User reviews information
-5. User quits (`q`)
-
-### Enhanced Flow (MVP 2)
-1. User launches application
-2. Application scans the requested directory and shows a loading banner
-3. Results render once the scan completes
-4. User navigates with arrow keys (or `j`/`k`)
-5. User presses Enter to drill into a directory (triggering a new scan)
-6. User presses Backspace to return to the parent directory
-7. Status bar highlights scan duration or any errors
-8. User quits with `q` when finished
+### Current Flow
+1. User launches `disksize [path]` (defaults to current directory)
+2. Application scans the directory, showing live progress (file/dir count, size, throughput)
+3. Scan completes; entry list renders sorted by size (largest first)
+4. User navigates with arrow keys or `j`/`k`; uses `Page Up`/`Page Down`/`Home`/`End` for fast scrolling
+5. User presses `Enter` to expand/collapse a directory in the tree view
+6. User presses `→`/`l` to expand or enter a directory (triggering a sub-scan if needed)
+7. User presses `←`/`h` to collapse a directory or `Backspace` to navigate to the parent
+8. User presses `s` to cycle sort order, `r` to refresh, `Delete` to delete
+9. Status bar shows scan duration and warnings (left-aligned) with key hints (right-aligned)
+10. User quits with `q`
 
 ## Error Handling
 
 ### Error Display
-```
-╔═════════════════════════════════════════════════════════════╗
-║ ⚠ Warning                                                   ║
-╠═════════════════════════════════════════════════════════════╣
-║                                                             ║
-║  Could not access:                                          ║
-║    /System/Library/PrivateData/                             ║
-║                                                             ║
-║  Reason: Permission denied                                  ║
-║                                                             ║
-║  Continuing with remaining directories...                   ║
-║                                                             ║
-║                                             [Press any key] ║
-╚═════════════════════════════════════════════════════════════╝
-```
+Errors are handled gracefully without interrupting the user:
+- **Permission denied / IO errors during scan**: Skipped files are counted and shown as warnings in the status bar (e.g., `Scan completed in 2.3s • 5 warning(s)`) and in the entry list footer (`Warnings: 5 item(s) skipped`).
+- **Directory not found / scan failure**: Shown inline in the entry list as `Error: <message>` in red.
+- **Deletion errors**: The deletion dialog closes and the error is shown in the status bar.
 
 ### Error Types
-- **Permission Denied**: Skip and continue, log to error list
-- **Directory Not Found**: Show error, return to parent
-- **Disk Error**: Show error, offer retry
-- **Invalid Path**: Show error message, prompt for new path
+- **Permission Denied**: Skip and continue, count as warning
+- **Directory Not Found**: Show error inline in entry list
+- **IO Error**: Skip and continue, count as warning
+- **Invalid Path**: Show error message in entry list
 
 ## Progress Indication
 
 ### Scanning Progress
-Progress is indeterminate - we show actual statistics as the scan proceeds without estimating completion:
-```
-Scanning | /Users/username/Documents/Projects
+Progress is indeterminate - we show actual statistics as the scan proceeds without estimating completion. The entry list area shows live scan feedback:
 
+```
+Entries (Sort: Size ↓)
+Scanning / /Users/username/Documents/Projects
 Files: 1,234  Dirs: 42  Size: 2.4 GB
 Rate: 125 MB/s
 Current: /Users/username/Documents/Projects/node_modules
+```
+
+The status bar also shows a compact summary with spinner, elapsed time, and throughput:
+```
+Scanning / (5s) F:1.2K D:42 2.4 GB                                    q: Quit
 ```
 
 This approach provides honest, real-time feedback without the complexity and inaccuracy of pre-scan estimation or progress bar heuristics.
@@ -188,14 +190,16 @@ This approach provides honest, real-time feedback without the complexity and ina
 - No reliance on color alone for critical information
 
 ## Responsive Design
-- Minimum terminal size: 80x24
-- Adapt layout for larger terminals
-- Truncate long paths with ellipsis
-- Horizontal scrolling for very long names (future)
+- Minimum effective terminal size: 48 columns x 16 rows (smaller terminals are clamped)
+- Adapts layout to fill larger terminals (dynamic row count for entry list)
+- Long paths shortened with middle-ellipsis (`/Users/...uments/Projects`)
+- Long names truncated with trailing ellipsis (`very-long-directo...`)
 
 ## Feedback & Confirmation
 - Immediate visual feedback for all actions
 - No confirmation dialogs for navigation
+- Deletion requires confirmation via a centered dialog (press `y` to confirm, `n`/`Escape` to cancel)
+- Deletion in progress shows a spinner dialog with item name and size
 - Progress indication for long operations
 - Success/failure messages in status bar
 
@@ -205,27 +209,8 @@ This approach provides honest, real-time feedback without the complexity and ina
 - Keep UI responsive during scanning
 - Show "working" indicators for any operation >100ms
 
-## Help System (MVP 3)
-```
-╔═════════════════════════════════════════════════════════════╗
-║ DiskSize - Help                                             ║
-╠═════════════════════════════════════════════════════════════╣
-║                                                             ║
-║  Navigation:                                                ║
-║    ↑/↓ or j/k     Move selection up/down                    ║
-║    Enter or →/l   Open selected directory                   ║
-║    Backspace/←/h  Go to parent directory                    ║
-║    g/G            Jump to top/bottom                        ║
-║                                                             ║
-║  Actions:                                                   ║
-║    s              Change sort order                         ║
-║    r              Refresh current directory                 ║
-║    q/Esc          Quit application                          ║
-║    ?              Show this help                            ║
-║                                                             ║
-║                                             [Press any key] ║
-╚═════════════════════════════════════════════════════════════╝
-```
+## Help System (Planned)
+An in-app help screen (triggered by `?` or `F1`) is planned but not yet implemented. Current key hints are shown in the status bar at the bottom of the screen.
 
 ## Future UX Enhancements
 - Mouse support for terminal emulators that support it
