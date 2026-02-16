@@ -78,43 +78,32 @@ disksize ~/Documents
 ╚═════════════════════════════════════════════════════════════╝
 ```
 
-## Development Roadmap
+## What's Done
 
-### MVP 1: Basic Directory Scanning ✅
-- ✅ Command-line directory path support
-- ✅ Recursive directory scanning
-- ✅ Size calculation and statistics
-- ✅ Basic TUI display
-- ✅ Cross-platform POSIX implementation
+- Recursive directory scanning with streaming progress and elapsed time
+- Interactive keyboard navigation (arrow keys, vim-style `hjkl`)
+- Sort by size, name, or date (`s` key)
+- Color-coded sizes with percentage bars
+- File and directory listing with symlink detection
+- Refresh current directory with cache preservation (`r` key)
+- Delete files/directories with confirmation dialog (Delete key)
+- Deletion progress with spinner animation
+- Comprehensive error handling (permission denied, IO errors, etc.)
+- Cross-platform: macOS (ARM64/x64), Linux (x64/ARM64), Windows (x64)
+- `make install` / `make uninstall` for macOS
 
-### MVP 2: Interactive Navigation ✅
-- ✅ Keyboard navigation (arrow keys, vim-style)
-- ✅ Drill down into directories
-- ✅ Sort by size, name, date
-- ✅ Status bar and color coding
-- ✅ Display files and directories
-- ✅ Refresh functionality
-- ✅ File deletion with confirmation
+## TODO
 
-### MVP 3: Tree Visualization
-- Tree view with indentation
-- Percentage bars
-- File type detection
-- Multiple view modes
-
-### MVP 4: Advanced Features
+- Tree view with indentation and expandable nodes
+- File type detection and icons
+- Multiple view modes (tree, list, details)
 - Search and filter
-- Export results
-- Comparison mode
+- Export results (CSV, JSON)
+- Ignore patterns (.gitignore support)
 - Configuration file
-
-### MVP 5: Production Release
-- Performance optimization
-- All platforms tested
-- Binary releases
-- Installation packages
-
-See [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md) for detailed roadmap.
+- Parallel scanning
+- In-app help system
+- Binary releases and installation packages for Linux/Windows
 
 ## Documentation
 
@@ -276,6 +265,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ---
 
-**Status:** MVP 2 Complete ✅
-
-**Next milestone:** MVP 3 - Tree visualization and advanced filtering
+**Status:** Core features complete. Working on tree visualization and advanced features.

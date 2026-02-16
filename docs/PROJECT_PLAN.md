@@ -15,74 +15,32 @@ Build a TreeSize-inspired Terminal User Interface (TUI) application for scanning
 - **Quality Assurance**: TDD with comprehensive unit and integration tests
 - **Documentation**: Living documentation maintained alongside code
 
-## MVP Roadmap
+## What's Done
 
-### MVP 1: Basic Directory Scanning & Display (Complete)
-**Goal**: Scan a directory and display basic size information in TUI
+- Recursive directory scanning with streaming progress and elapsed time
+- Interactive keyboard navigation (arrow keys, vim-style hjkl)
+- Sort by size, name, or date with sort key hints
+- Color-coded sizes with percentage bars
+- File and directory listing with symlink detection
+- Refresh current directory with intelligent cache preservation
+- Delete files/directories with confirmation dialog and progress spinner
+- Comprehensive error handling and classification (permission denied, IO errors, not found)
+- Cross-platform: macOS (ARM64/x64), Linux (x64/ARM64), Windows (x64 via MinGW)
+- Adaptive progress tracking with throughput display
+- macOS install/uninstall via Makefile
 
-**Features**:
-- Command-line argument to specify directory path (default: current directory)
-- Recursive directory scanning
-- Calculate and display:
-  - Total size of directory
-  - Count of files and subdirectories
-  - List of immediate subdirectories with sizes
-- Basic TUI with static display
-- Cross-platform file system access
+## TODO
 
-**Success Criteria**:
-- Accurately calculates directory sizes
-- Displays results in a readable TUI format
-- Works on macOS (primary development platform)
-- 80%+ test coverage
-
-### MVP 2: Interactive Navigation (Complete)
-**Goal**: Navigate through directory hierarchy interactively
-
-**Features**:
-- [x] Keyboard navigation (arrow keys, Enter to drill down, Backspace to go up)
-- [x] Highlight selected directory with contextual status bar hints
-- [x] Sort options (by size, name, date)
-- [x] Enhanced status bar showing aggregated totals for selection
-- [x] Color-coded size indicators
-- [x] Display both files and directories
-- [x] Refresh functionality (r key)
-- [x] File deletion with confirmation (Delete key)
-- [x] Intelligent cache preservation during navigation
-- [x] Symlink handling without following
-- [x] Streaming progress updates during scan
-
-### MVP 3: Tree Visualization & Percentages
-**Goal**: Visual representation of space usage
-
-**Features**:
-- Tree view with indentation
-- Percentage bars showing relative size
+- Tree view with indentation and expandable nodes
 - File type detection and icons
 - Multiple view modes (tree, list, details)
-- Filter by file type
-
-### MVP 4: Advanced Features
-**Goal**: Power user features and performance optimization
-
-**Features**:
-- Search/filter functionality
-- Export results (CSV, JSON, text)
-- Comparison mode (compare two directories)
+- Search and filter
+- Export results (CSV, JSON)
 - Ignore patterns (.gitignore support)
-- Incremental scanning with progress indicator
-- Configuration file support
-
-### MVP 5: Performance & Polish
-**Goal**: Production-ready application
-
-**Features**:
-- Performance optimization (caching, parallel scanning)
-- Linux and Windows testing and fixes
-- Comprehensive error handling
-- User manual and help system
-- Binary releases for all platforms
-- Installation scripts
+- Configuration file
+- Parallel scanning
+- In-app help system
+- Binary releases and installation packages for Linux/Windows
 
 ## Technical Stack
 - **Language**: Kotlin 2.2.20
@@ -116,21 +74,8 @@ disksize/
 ```
 
 ## Current Status
-- **Phase**: MVP 2 Complete - Ready for MVP 3
-- **Recent Progress**:
-  - ✅ Completed all MVP 2 interactive navigation features
-  - ✅ Added directory refresh with intelligent cache preservation
-  - ✅ Implemented file deletion with confirmation dialog
-  - ✅ Added streaming progress updates with Flow-based scanning
-  - ✅ Proper symlink handling without following
-  - ✅ Show both files and directories with sorting
-  - ✅ Enhanced status bar with contextual hints
-- **Next Steps**:
-  1. Add tree visualization with indentation
-  2. Implement percentage bars in tree view
-  3. Add file type detection and icons
-  4. Create multiple view modes (tree, list, details)
-  5. Add filter by file type functionality
+
+Core features complete. Next focus: tree visualization and advanced features.
 
 ## Success Metrics
 - **Performance**: Scan 100GB in under 30 seconds
