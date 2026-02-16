@@ -295,7 +295,10 @@ private fun fileLine(width: Int, item: BrowserItem, isSelected: Boolean): FrameL
     val prefixLen = item.treePrefix.length + spacer.length
 
     val sizePart = size
-    val availableForLabel = (innerWidth - sizePart.length - 3 - prefixLen).coerceAtLeast(0)
+    // Compute barWidth same as directoryLine so file sizes align with directory sizes
+    val availableForBar = innerWidth - sizePart.length - 4 - prefixLen
+    val barWidth = max(0, min(PROGRESS_BAR_TARGET, availableForBar / 2))
+    val availableForLabel = (innerWidth - sizePart.length - barWidth - 3 - prefixLen).coerceAtLeast(0)
 
     val segments = mutableListOf<Segment>()
     if (item.treePrefix.isNotEmpty()) {

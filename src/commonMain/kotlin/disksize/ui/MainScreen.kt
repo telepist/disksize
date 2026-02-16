@@ -29,7 +29,7 @@ fun MainScreen(
     onQuit: () -> Unit
 ) {
     val terminalState = LocalTerminalState.current
-    val frameWidth = max(MIN_WIDTH, terminalState?.size?.columns ?: 80)
+    val frameWidth = max(MIN_WIDTH, (terminalState?.size?.columns ?: 80) - 1)
     val frameRows = max(MIN_ROWS, terminalState?.size?.rows ?: 24)
 
     val frameLines = remember(state, frameWidth, frameRows) {
