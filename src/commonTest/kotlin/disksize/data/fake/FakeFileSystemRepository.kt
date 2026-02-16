@@ -92,7 +92,9 @@ class FakeFileSystemRepository : FileSystemRepository() {
         path: String,
         errors: MutableList<ScanError>,
         tracker: AdaptiveProgressTracker,
-        isRoot: Boolean
+        isRoot: Boolean,
+        onSubdirScanned: (suspend (FileNode) -> Unit)?,
+        scannedPaths: MutableSet<String>?
     ): FileNode {
         if (path in inaccessiblePaths) throw Exception("Permission denied: $path")
         val node = files[path] ?: throw Exception("Directory not found: $path")
@@ -104,7 +106,9 @@ class FakeFileSystemRepository : FileSystemRepository() {
 
         tracker.startDirectory(node.path, isRoot)
 
+        // Phase 1: list all immediate children
         val children = mutableListOf<FileNode>()
+        val dirIndices = mutableListOf<Int>()
         var filesInDir = 0
         var directoriesInDir = 0
 
@@ -119,14 +123,42 @@ class FakeFileSystemRepository : FileSystemRepository() {
             }
 
             if (child.isDirectory) {
-                val sanitized = scanDirectoryRecursive(child.path, errors, tracker, isRoot = false)
-                children += sanitized
+                dirIndices += children.size
+                children += child.copy(
+                    children = emptyList(),
+                    cachedTotalSize = child.size,
+                    cachedFileCount = 0,
+                    cachedDirectoryCount = 0
+                )
                 directoriesInDir++
             } else {
                 tracker.onFileProcessed(child.path, child.size)
                 children += child
                 filesInDir++
             }
+        }
+
+        // Emit initial aggregate with all children visible (dirs as placeholders)
+        onSubdirScanned?.invoke(calculateAggregates(node, children))
+
+        // Phase 2: scan each child directory
+        for (dirIndex in dirIndices) {
+            val placeholder = children[dirIndex]
+
+            val wrappedCallback: (suspend (FileNode) -> Unit)? =
+                if (onSubdirScanned != null) {
+                    { innerPartialNode ->
+                        children[dirIndex] = innerPartialNode
+                        onSubdirScanned(calculateAggregates(node, children))
+                    }
+                } else null
+
+            val scannedChild = scanDirectoryRecursive(
+                placeholder.path, errors, tracker, isRoot = false, wrappedCallback, scannedPaths
+            )
+            children[dirIndex] = scannedChild
+            scannedPaths?.add(placeholder.path)
+            onSubdirScanned?.invoke(calculateAggregates(node, children))
         }
 
         tracker.onDirectoryProcessed(node.path, isRoot, filesInDir, directoriesInDir)

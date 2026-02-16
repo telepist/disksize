@@ -124,13 +124,11 @@ fun DiskSizeApp(
         onToggleExpand = {
             val selectedItem = state.browserItems.getOrNull(state.selectedIndex) ?: return@MainScreen
             if (!selectedItem.node.isDirectory) return@MainScreen
-            if (!selectedItem.isScanned) return@MainScreen
             state = state.withToggleExpand(selectedItem.node.path)
         },
         onExpandOrEnter = {
             val selectedItem = state.browserItems.getOrNull(state.selectedIndex) ?: return@MainScreen
             if (!selectedItem.node.isDirectory) return@MainScreen
-            if (!selectedItem.isScanned) return@MainScreen
             if (selectedItem.isExpanded) {
                 // Already expanded — move to first child
                 val nextIndex = state.selectedIndex + 1

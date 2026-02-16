@@ -76,7 +76,23 @@ abstract class FileSystemRepository {
         var lastPartialEmitMs = partialClock.elapsedNow().inWholeMilliseconds
         for ((i, dirIndex) in dirIndices.withIndex()) {
             val placeholder = children[dirIndex]
-            val scannedChild = scanDirectoryRecursive(placeholder.path, errors, tracker, isRoot = false)
+
+            val scannedChild = scanDirectoryRecursive(
+                placeholder.path, errors, tracker, isRoot = false,
+                onSubdirScanned = { partialNode ->
+                    // Callback from recursive scan: a subdirectory within this
+                    // depth-0 directory completed. Update the tree and emit if
+                    // enough time has passed.
+                    children[dirIndex] = partialNode
+                    val cbNow = partialClock.elapsedNow().inWholeMilliseconds
+                    if (cbNow - lastPartialEmitMs >= PARTIAL_TREE_MIN_INTERVAL_MS) {
+                        val updatedRoot = calculateAggregates(rootNode, children)
+                        emit(DirectoryScanUpdate.PartialTree(updatedRoot, scannedPaths.toSet(), errors.toList()))
+                        lastPartialEmitMs = cbNow
+                    }
+                },
+                scannedPaths = scannedPaths
+            )
             children[dirIndex] = scannedChild
             scannedPaths += placeholder.path
 
@@ -202,12 +218,25 @@ abstract class FileSystemRepository {
 
     /**
      * Recursively scan a directory and build the file tree.
+     *
+     * Uses a two-pass pattern: first lists all immediate children (so they are
+     * visible in the tree as placeholders), then scans each child directory.
+     *
+     * @param onSubdirScanned Called after each child directory is fully scanned,
+     *   with the partially-built node for this directory. Implementations should
+     *   also wrap this callback for recursive calls so that inner completions
+     *   propagate aggregated partial state upward.
+     * @param scannedPaths Shared set tracking all directories that have been
+     *   fully scanned. Each directory path is added after its recursive scan
+     *   completes. Used by the UI to show dimmed placeholders for unscanned dirs.
      */
     protected abstract suspend fun scanDirectoryRecursive(
         path: String,
         errors: MutableList<ScanError>,
         tracker: AdaptiveProgressTracker,
-        isRoot: Boolean
+        isRoot: Boolean,
+        onSubdirScanned: (suspend (FileNode) -> Unit)? = null,
+        scannedPaths: MutableSet<String>? = null
     ): FileNode
 
     /**

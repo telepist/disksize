@@ -66,7 +66,9 @@ class WindowsFileSystemRepository : FileSystemRepository() {
         path: String,
         errors: MutableList<ScanError>,
         tracker: AdaptiveProgressTracker,
-        isRoot: Boolean
+        isRoot: Boolean,
+        onSubdirScanned: (suspend (FileNode) -> Unit)?,
+        scannedPaths: MutableSet<String>?
     ): FileNode {
         val baseNode = createFileNode(path)
 
@@ -77,7 +79,9 @@ class WindowsFileSystemRepository : FileSystemRepository() {
 
         tracker.startDirectory(baseNode.path, isRoot)
 
+        // --- Phase 1: list all immediate children ---
         val children = mutableListOf<FileNode>()
+        val dirIndices = mutableListOf<Int>()
         var filesInDir = 0
         var directoriesInDir = 0
 
@@ -108,17 +112,14 @@ class WindowsFileSystemRepository : FileSystemRepository() {
                     try {
                         val childNode = createFileNode(childPath)
 
-                        // Skip symlinks - they are not followed and counted only by their link size
-                        if (childNode.isSymlink) {
-                            tracker.onFileProcessed(childNode.path, childNode.size)
-                            children.add(childNode)
-                            filesInDir++
-                            continue
-                        }
-
-                        if (childNode.isDirectory) {
-                            val sanitized = scanDirectoryRecursive(childPath, errors, tracker, isRoot = false)
-                            children.add(sanitized)
+                        if (childNode.isDirectory && !childNode.isSymlink) {
+                            dirIndices += children.size
+                            children.add(childNode.copy(
+                                children = emptyList(),
+                                cachedTotalSize = childNode.size,
+                                cachedFileCount = 0,
+                                cachedDirectoryCount = 0
+                            ))
                             directoriesInDir++
                         } else {
                             tracker.onFileProcessed(childNode.path, childNode.size)
@@ -131,12 +132,34 @@ class WindowsFileSystemRepository : FileSystemRepository() {
                             message = e.message ?: "Unable to access $childPath",
                             type = classifyError(e)
                         )
-                        continue
                     }
                 } while (FindNextFileW(handle, findData.ptr) != 0)
             } finally {
                 FindClose(handle)
             }
+        }
+
+        // Emit initial aggregate with all children visible (dirs as placeholders)
+        onSubdirScanned?.invoke(calculateAggregates(baseNode, children))
+
+        // --- Phase 2: scan each child directory ---
+        for (dirIndex in dirIndices) {
+            val placeholder = children[dirIndex]
+
+            val wrappedCallback: (suspend (FileNode) -> Unit)? =
+                if (onSubdirScanned != null) {
+                    { innerPartialNode ->
+                        children[dirIndex] = innerPartialNode
+                        onSubdirScanned(calculateAggregates(baseNode, children))
+                    }
+                } else null
+
+            val scannedChild = scanDirectoryRecursive(
+                placeholder.path, errors, tracker, isRoot = false, wrappedCallback, scannedPaths
+            )
+            children[dirIndex] = scannedChild
+            scannedPaths?.add(placeholder.path)
+            onSubdirScanned?.invoke(calculateAggregates(baseNode, children))
         }
 
         tracker.onDirectoryProcessed(baseNode.path, isRoot, filesInDir, directoriesInDir)

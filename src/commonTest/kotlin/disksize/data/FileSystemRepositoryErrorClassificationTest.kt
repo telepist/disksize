@@ -19,7 +19,9 @@ private class TestFileSystemRepository : FileSystemRepository() {
         path: String,
         errors: MutableList<ScanError>,
         tracker: AdaptiveProgressTracker,
-        isRoot: Boolean
+        isRoot: Boolean,
+        onSubdirScanned: (suspend (FileNode) -> Unit)?,
+        scannedPaths: MutableSet<String>?
     ): FileNode {
         throw UnsupportedOperationException("Not used in tests")
     }

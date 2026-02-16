@@ -915,8 +915,9 @@ class ExplorerStateTest {
             errors = emptyList()
         )
 
+        // When dirA is fully scanned, all its child dirs are also tracked in scannedPaths
         var state = ExplorerState(currentPath = "/root")
-            .withPartialScanResult(scanResult, scannedPaths = setOf("/root/dirA"))
+            .withPartialScanResult(scanResult, scannedPaths = setOf("/root/dirA", "/root/dirA/sub1", "/root/dirA/sub2"))
         state = state.withToggleExpand("/root/dirA")
 
         // Depth-1 children of scanned dirA should be isScanned=true

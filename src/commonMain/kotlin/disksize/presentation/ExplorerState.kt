@@ -432,17 +432,15 @@ private fun flattenChildren(
         val isExpanded = item.kind == BrowserItemKind.DIRECTORY && item.node.path in expandedPaths
         val isScanned = when {
             item.kind != BrowserItemKind.DIRECTORY -> true
-            depth > 0 -> true
             !isScanInProgress -> true
             else -> item.node.path in scannedPaths
         }
         val isScanning = when {
             item.kind != BrowserItemKind.DIRECTORY -> false
-            depth > 0 -> false
             !isScanInProgress -> false
-            isScanned -> false
-            else -> loadingDirectoryPath != null &&
-                (loadingDirectoryPath == item.node.path || loadingDirectoryPath.startsWith("${item.node.path}/"))
+            item.node.path in scannedPaths -> false
+            loadingDirectoryPath == null -> false
+            else -> loadingDirectoryPath == item.node.path || loadingDirectoryPath.startsWith("${item.node.path}/")
         }
         val itemWithTree = item.copy(
             depth = depth,

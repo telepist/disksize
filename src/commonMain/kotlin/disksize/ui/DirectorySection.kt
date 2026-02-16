@@ -138,16 +138,17 @@ private fun browserLines(
         val item = items[index]
         val line = when (item.kind) {
             BrowserItemKind.DIRECTORY -> {
-                val isCurrentlyScanning = item.depth == 0 && !item.isScanned &&
-                    loadingDirPath != null &&
-                    (loadingDirPath == item.node.path || loadingDirPath.startsWith("${item.node.path}/"))
-                val displaySize = if (isCurrentlyScanning) liveBytes.coerceAtLeast(item.totalSize) else item.totalSize
+                // Use live bytes only for the depth-0 directory being scanned
+                // (tracks total progress bytes). Nested dirs get accurate sizes
+                // from the partial tree emissions via the scan callback.
+                val isDepth0Scanning = item.isScanning && item.depth == 0
+                val displaySize = if (isDepth0Scanning) liveBytes.coerceAtLeast(item.totalSize) else item.totalSize
                 val adjustedParentTotal = if (item.depth == 0 && depth0ParentAdjustment > 0L) {
                     item.parentTotalSize + depth0ParentAdjustment
                 } else {
                     item.parentTotalSize
                 }
-                directoryLine(width, item, index == state.selectedIndex, state.spinnerFrame, isCurrentlyScanning, displaySize, adjustedParentTotal)
+                directoryLine(width, item, index == state.selectedIndex, state.spinnerFrame, item.isScanning, displaySize, adjustedParentTotal)
             }
             BrowserItemKind.FILE -> fileLine(width, item, index == state.selectedIndex)
         }
