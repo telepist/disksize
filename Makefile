@@ -65,6 +65,9 @@ endif
 DEBUG_EXECUTABLE := ./build/bin/$(PLATFORM_DIR)/debugExecutable/$(EXECUTABLE)
 RELEASE_EXECUTABLE := ./build/bin/$(PLATFORM_DIR)/releaseExecutable/$(EXECUTABLE)
 
+# Local overrides (optional — create Makefile.local to set INSTALL_DIR etc.)
+-include Makefile.local
+
 # Install paths
 INSTALL_DIR ?= /usr/local/bin
 INSTALL_NAME := disksize
@@ -80,11 +83,14 @@ help:
 	@echo "  make test            - Run all tests"
 	@echo "  make test-coverage   - Run tests and generate coverage report"
 	@echo "  make clean           - Clean build artifacts"
-	@echo "  make install         - Install release binary to $(INSTALL_DIR) (macOS only)"
+	@echo "  make install         - Install release binary to $(INSTALL_DIR)"
 	@echo "  make uninstall       - Remove installed binary from $(INSTALL_DIR)"
 	@echo ""
 	@echo "Detected platform: $(PLATFORM) ($(OS_NAME))"
 	@echo "Note: TUI apps must be run in a real terminal, not through Gradle tasks."
+	@echo ""
+	@echo "To customize INSTALL_DIR, create Makefile.local with:"
+	@echo "  INSTALL_DIR = /your/preferred/path"
 
 # Build debug executable for current platform
 build:
@@ -127,9 +133,24 @@ clean:
 	$(GRADLE) clean$(GRADLE_END)
 	@echo "Build artifacts cleaned"
 
-# Install binary to system (macOS only for now)
+# Install binary to system
 install: build-release
-ifeq ($(UNAME_S),Darwin)
+ifeq ($(OS),Windows_NT)
+  ifeq ($(INSTALL_DIR),/usr/local/bin)
+	@echo "Error: INSTALL_DIR must be set on Windows."
+	@echo "Create Makefile.local with:"
+	@echo "  INSTALL_DIR = C:/Users/yourname/bin"
+	@exit 1
+  endif
+	@echo "Installing $(INSTALL_NAME) to $(INSTALL_DIR)..."
+	@if [ ! -d "$(INSTALL_DIR)" ]; then \
+		echo "Error: $(INSTALL_DIR) does not exist"; \
+		exit 1; \
+	fi
+	@cp $(RELEASE_EXECUTABLE) $(INSTALL_DIR)/$(INSTALL_NAME).exe
+	@echo "Installed $(INSTALL_NAME) to $(INSTALL_DIR)/$(INSTALL_NAME).exe"
+	@echo "  Make sure $(INSTALL_DIR) is in your PATH."
+else
 	@echo "Installing $(INSTALL_NAME) to $(INSTALL_DIR)..."
 	@if [ ! -d "$(INSTALL_DIR)" ]; then \
 		echo "Error: $(INSTALL_DIR) does not exist"; \
@@ -140,16 +161,27 @@ ifeq ($(UNAME_S),Darwin)
 		exit 1; \
 	fi
 	@install -m 755 $(RELEASE_EXECUTABLE) $(INSTALL_DIR)/$(INSTALL_NAME)
-	@echo "✓ Installed $(INSTALL_NAME) to $(INSTALL_DIR)/$(INSTALL_NAME)"
+	@echo "Installed $(INSTALL_NAME) to $(INSTALL_DIR)/$(INSTALL_NAME)"
 	@echo "  You can now run: $(INSTALL_NAME)"
-else
-	@echo "Error: Install target is currently only supported on macOS"
-	@exit 1
 endif
 
 # Uninstall binary from system
 uninstall:
-ifeq ($(UNAME_S),Darwin)
+ifeq ($(OS),Windows_NT)
+  ifeq ($(INSTALL_DIR),/usr/local/bin)
+	@echo "Error: INSTALL_DIR must be set on Windows."
+	@echo "Create Makefile.local with:"
+	@echo "  INSTALL_DIR = C:/Users/yourname/bin"
+	@exit 1
+  endif
+	@echo "Uninstalling $(INSTALL_NAME) from $(INSTALL_DIR)..."
+	@if [ ! -f "$(INSTALL_DIR)/$(INSTALL_NAME).exe" ]; then \
+		echo "Error: $(INSTALL_NAME) is not installed in $(INSTALL_DIR)"; \
+		exit 1; \
+	fi
+	@rm -f $(INSTALL_DIR)/$(INSTALL_NAME).exe
+	@echo "Uninstalled $(INSTALL_NAME) from $(INSTALL_DIR)"
+else
 	@echo "Uninstalling $(INSTALL_NAME) from $(INSTALL_DIR)..."
 	@if [ ! -f "$(INSTALL_DIR)/$(INSTALL_NAME)" ]; then \
 		echo "Error: $(INSTALL_NAME) is not installed in $(INSTALL_DIR)"; \
@@ -160,8 +192,5 @@ ifeq ($(UNAME_S),Darwin)
 		exit 1; \
 	fi
 	@rm -f $(INSTALL_DIR)/$(INSTALL_NAME)
-	@echo "✓ Uninstalled $(INSTALL_NAME) from $(INSTALL_DIR)"
-else
-	@echo "Error: Uninstall target is currently only supported on macOS"
-	@exit 1
+	@echo "Uninstalled $(INSTALL_NAME) from $(INSTALL_DIR)"
 endif

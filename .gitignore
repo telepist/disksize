@@ -71,6 +71,7 @@ logs/
 ### Local configuration ###
 local.properties
 gradle.properties.local
+Makefile.local
 
 ### Claude Code ###
 .claude/
