@@ -45,8 +45,8 @@ internal fun statusLine(state: ExplorerState, width: Int): FrameLine {
 
             val progress = state.loadingProgress
             if (progress != null) {
-                segments += Segment(" F:${formatCount(progress.processedFiles)}", Color.Cyan)
-                segments += Segment(" D:${formatCount(progress.processedDirectories)}", Color.Cyan)
+                segments += Segment(" Files:${formatCount(progress.processedFiles)}", Color.Cyan)
+                segments += Segment(" Dirs:${formatCount(progress.processedDirectories)}", Color.Cyan)
                 segments += Segment(" ${SizeFormatter.format(progress.scannedBytes)}", Color.Green)
             }
         }
