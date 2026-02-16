@@ -74,7 +74,8 @@ gradle.properties.local
 Makefile.local
 
 ### Claude Code ###
-.claude/
+.claude/*
+!.claude/skills/
 
 ### Node.js (not part of this project) ###
 node_modules/
