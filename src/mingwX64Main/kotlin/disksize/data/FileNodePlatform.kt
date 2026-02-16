@@ -6,10 +6,28 @@ import platform.windows.*
 
 @OptIn(ExperimentalForeignApi::class)
 internal fun platformCreateFileNode(path: String): FileNode = memScoped {
-    val findData = alloc<WIN32_FIND_DATAW>()
-
     // Normalize path for Windows
     val normalizedPath = WindowsPathUtils.normalize(path)
+
+    // Drive root paths (e.g., "C:\") cannot be queried with FindFirstFileW.
+    // Handle them via GetFileAttributesW instead.
+    if (isDriveRoot(normalizedPath)) {
+        val attrs = GetFileAttributesW(normalizedPath)
+        if (attrs == INVALID_FILE_ATTRIBUTES) {
+            throw Exception("Cannot get file info: $path")
+        }
+        return@memScoped FileNode(
+            path = normalizedPath,
+            name = normalizedPath,
+            size = 0L,
+            isDirectory = true,
+            isSymlink = false,
+            children = emptyList(),
+            lastModified = 0L
+        )
+    }
+
+    val findData = alloc<WIN32_FIND_DATAW>()
 
     // Use FindFirstFile to get file information (works for both files and directories)
     val handle = FindFirstFileW(normalizedPath, findData.ptr)
@@ -49,4 +67,11 @@ internal fun platformCreateFileNode(path: String): FileNode = memScoped {
         children = emptyList(),
         lastModified = lastModified
     )
+}
+
+/** True for drive root paths like "C:\" or "C:". */
+private fun isDriveRoot(path: String): Boolean {
+    if (path.length == 3 && path[1] == ':' && path[2] == '\\') return true
+    if (path.length == 2 && path[1] == ':') return true
+    return false
 }
