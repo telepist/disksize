@@ -5,6 +5,7 @@ import disksize.presentation.BrowserItem
 import disksize.presentation.BrowserItemKind
 import disksize.presentation.ExplorerState
 import disksize.presentation.LoadingProgress
+import disksize.presentation.isSubPathOf
 import disksize.util.SizeFormatter
 import kotlin.math.max
 import kotlin.math.min
@@ -123,7 +124,7 @@ private fun browserLines(
         if (loadingDirPath == null) return@run 0L
         for (item in items) {
             if (item.kind == BrowserItemKind.DIRECTORY && item.depth == 0 && !item.isScanned) {
-                val isScanning = loadingDirPath == item.node.path || loadingDirPath.startsWith("${item.node.path}/")
+                val isScanning = loadingDirPath == item.node.path || loadingDirPath.isSubPathOf(item.node.path)
                 if (isScanning) {
                     val displaySize = liveBytes.coerceAtLeast(item.totalSize)
                     return@run (displaySize - item.totalSize).coerceAtLeast(0L)

@@ -193,7 +193,7 @@ fun ExplorerState.withToggleExpand(path: String): ExplorerState {
     val root = scanResult?.rootNode ?: return this
     val newExpanded = if (path in expandedPaths) {
         // Collapse: remove path and all descendants
-        expandedPaths.filterNot { p -> p == path || p.startsWith("$path/") }.toSet()
+        expandedPaths.filterNot { p -> p == path || p.isSubPathOf(path) }.toSet()
     } else {
         expandedPaths + path
     }
@@ -236,7 +236,7 @@ fun ExplorerState.startDeleting(): ExplorerState {
 fun ExplorerState.withItemDeleted(deletedPath: String): ExplorerState {
     // Remove deleted path and any children from expandedPaths
     val updatedExpandedPaths = expandedPaths.filterNot { p ->
-        p == deletedPath || p.startsWith("$deletedPath/")
+        p == deletedPath || p.isSubPathOf(deletedPath)
     }.toSet()
 
     // Update the scan result to remove the deleted node from the tree
@@ -321,7 +321,7 @@ private fun updateNodeInTree(node: FileNode, pathToUpdate: String, newNode: File
     // If this is a directory, recursively update children
     if (node.isDirectory) {
         val updatedChildren = node.children.map { child ->
-            if (child.path == pathToUpdate || pathToUpdate.startsWith("${child.path}/")) {
+            if (child.path == pathToUpdate || pathToUpdate.isSubPathOf(child.path)) {
                 updateNodeInTree(child, pathToUpdate, newNode)
             } else {
                 child
@@ -382,7 +382,7 @@ private fun buildBrowserItems(
     // both sorting and parentTotalSize reflect the in-progress size.
     val parentTotalSize = root.children.filter(FileNode::isDirectory).sumOf { child ->
         val isScanning = isScanInProgress && loadingDirectoryPath != null &&
-            (loadingDirectoryPath == child.path || loadingDirectoryPath.startsWith("${child.path}/"))
+            (loadingDirectoryPath == child.path || loadingDirectoryPath.isSubPathOf(child.path))
         if (isScanning && scanningDirLiveBytes > 0) {
             scanningDirLiveBytes.coerceAtLeast(child.totalSize())
         } else {
@@ -410,7 +410,7 @@ private fun flattenChildren(
         // At depth 0, use live bytes for the scanning directory so sorting reflects
         // the in-progress size rather than the stale tree size.
         val isScanning = depth == 0 && isScanInProgress && loadingDirectoryPath != null &&
-            (loadingDirectoryPath == child.path || loadingDirectoryPath.startsWith("${child.path}/"))
+            (loadingDirectoryPath == child.path || loadingDirectoryPath.isSubPathOf(child.path))
         val effectiveSize = if (isScanning && scanningDirLiveBytes > 0) {
             scanningDirLiveBytes.coerceAtLeast(child.totalSize())
         } else {
@@ -440,7 +440,7 @@ private fun flattenChildren(
             !isScanInProgress -> false
             item.node.path in scannedPaths -> false
             loadingDirectoryPath == null -> false
-            else -> loadingDirectoryPath == item.node.path || loadingDirectoryPath.startsWith("${item.node.path}/")
+            else -> loadingDirectoryPath == item.node.path || loadingDirectoryPath.isSubPathOf(item.node.path)
         }
         val itemWithTree = item.copy(
             depth = depth,
@@ -509,3 +509,7 @@ enum class SortOrder(val label: String) {
 }
 
 private val SPINNER_FRAMES = "|/-\\".toCharArray()
+
+/** True when [this] path is a direct or nested child of [parent] (handles both `/` and `\`). */
+internal fun String.isSubPathOf(parent: String): Boolean =
+    startsWith("$parent/") || startsWith("$parent\\")
