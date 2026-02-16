@@ -115,6 +115,24 @@ private fun browserLines(
 
     val loadingDirPath = state.loadingDirectoryPath
     val liveBytes = state.scanningDirLiveBytes
+
+    // Pre-compute how much extra size the currently-scanning directory adds beyond
+    // what the tree knows about, so we can adjust parentTotalSize for all depth-0
+    // siblings and keep percentages consistent.
+    val depth0ParentAdjustment: Long = run {
+        if (loadingDirPath == null) return@run 0L
+        for (item in items) {
+            if (item.kind == BrowserItemKind.DIRECTORY && item.depth == 0 && !item.isScanned) {
+                val isScanning = loadingDirPath == item.node.path || loadingDirPath.startsWith("${item.node.path}/")
+                if (isScanning) {
+                    val displaySize = liveBytes.coerceAtLeast(item.totalSize)
+                    return@run (displaySize - item.totalSize).coerceAtLeast(0L)
+                }
+            }
+        }
+        0L
+    }
+
     for (index in startIndex until endIndex) {
         if (lines.size >= capacity) break
         val item = items[index]
@@ -124,7 +142,12 @@ private fun browserLines(
                     loadingDirPath != null &&
                     (loadingDirPath == item.node.path || loadingDirPath.startsWith("${item.node.path}/"))
                 val displaySize = if (isCurrentlyScanning) liveBytes.coerceAtLeast(item.totalSize) else item.totalSize
-                directoryLine(width, item, index == state.selectedIndex, state.spinnerFrame, isCurrentlyScanning, displaySize)
+                val adjustedParentTotal = if (item.depth == 0 && depth0ParentAdjustment > 0L) {
+                    item.parentTotalSize + depth0ParentAdjustment
+                } else {
+                    item.parentTotalSize
+                }
+                directoryLine(width, item, index == state.selectedIndex, state.spinnerFrame, isCurrentlyScanning, displaySize, adjustedParentTotal)
             }
             BrowserItemKind.FILE -> fileLine(width, item, index == state.selectedIndex)
         }
@@ -196,7 +219,7 @@ private fun loadingLines(
     return lines
 }
 
-private fun directoryLine(width: Int, item: BrowserItem, isSelected: Boolean, spinnerFrame: Char = ' ', isCurrentlyScanning: Boolean = false, displaySize: Long = item.totalSize): FrameLine {
+private fun directoryLine(width: Int, item: BrowserItem, isSelected: Boolean, spinnerFrame: Char = ' ', isCurrentlyScanning: Boolean = false, displaySize: Long = item.totalSize, parentTotalSizeOverride: Long = item.parentTotalSize): FrameLine {
     val innerWidth = width - 2
     val selector = if (isSelected) ">" else " "
     val node = item.node
@@ -212,7 +235,7 @@ private fun directoryLine(width: Int, item: BrowserItem, isSelected: Boolean, sp
         node.isDirectory && node.children.isNotEmpty() -> "▸ "
         else -> "  "
     }
-    val totalParentSize = item.parentTotalSize
+    val totalParentSize = parentTotalSizeOverride
     val size = SizeFormatter.format(displaySize)
     val percentage = if (totalParentSize > 0) displaySize.toDouble() / totalParentSize * 100 else 0.0
     val percentStr = formatPercentage(percentage)

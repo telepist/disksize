@@ -79,7 +79,8 @@ fun ExplorerState.withPartialScanResult(scanResult: ScanResult, scannedPaths: Se
     val items = buildBrowserItems(
         scanResult.rootNode, sortOrder, expandedPaths,
         isScanInProgress = true, scannedPaths = scannedPaths,
-        loadingDirectoryPath = loadingDirectoryPath
+        loadingDirectoryPath = loadingDirectoryPath,
+        scanningDirLiveBytes = scanningDirLiveBytes
     )
 
     val totalChildSize = childDirectoryTotalSize(items)
@@ -140,7 +141,7 @@ fun ExplorerState.withNextSortOrder(): ExplorerState {
     val newOrder = sortOrder.next()
     val selectedPath = browserItems.getOrNull(selectedIndex)?.node?.path
     val root = scanResult?.rootNode ?: return copy(sortOrder = newOrder)
-    val resortedItems = buildBrowserItems(root, newOrder, expandedPaths, isScanInProgress, scannedPaths, loadingDirectoryPath)
+    val resortedItems = buildBrowserItems(root, newOrder, expandedPaths, isScanInProgress, scannedPaths, loadingDirectoryPath, scanningDirLiveBytes)
     val totalChildSize = childDirectoryTotalSize(resortedItems)
     val newIndex = selectedPath?.let { path ->
         resortedItems.indexOfFirst { it.node.path == path }
@@ -158,9 +159,33 @@ fun ExplorerState.tickSpinner(): ExplorerState = copy(spinnerIndex = spinnerInde
 fun ExplorerState.withProgress(progress: ScanProgress): ExplorerState {
     val updatedProgress = LoadingProgress.fromDomain(progress)
     val directoryPath = progress.currentDirectory ?: loadingDirectoryPath
-    return copy(
+    val base = copy(
         loadingProgress = updatedProgress,
         loadingDirectoryPath = directoryPath
+    )
+
+    // Re-sort items so the scanning directory's position reflects its live
+    // bytes rather than the stale tree size from the last partial result.
+    val root = base.scanResult?.rootNode
+    if (root == null || !base.isScanInProgress || base.sortOrder != SortOrder.SIZE_DESC) return base
+    if (base.scanningDirLiveBytes <= 0L) return base
+
+    val selectedPath = base.browserItems.getOrNull(base.selectedIndex)?.node?.path
+    val items = buildBrowserItems(
+        root, base.sortOrder, base.expandedPaths,
+        isScanInProgress = true, scannedPaths = base.scannedPaths,
+        loadingDirectoryPath = base.loadingDirectoryPath,
+        scanningDirLiveBytes = base.scanningDirLiveBytes
+    )
+    val totalChildSize = childDirectoryTotalSize(items)
+    val newIndex = selectedPath?.let { path ->
+        items.indexOfFirst { it.node.path == path }
+    }?.takeIf { it >= 0 } ?: base.selectedIndex.coerceIn(0, (items.size - 1).coerceAtLeast(0))
+
+    return base.copy(
+        browserItems = items,
+        childDirectoryTotalSize = totalChildSize,
+        selectedIndex = newIndex
     )
 }
 
@@ -173,7 +198,7 @@ fun ExplorerState.withToggleExpand(path: String): ExplorerState {
         expandedPaths + path
     }
     val selectedPath = browserItems.getOrNull(selectedIndex)?.node?.path
-    val items = buildBrowserItems(root, sortOrder, newExpanded, isScanInProgress, scannedPaths, loadingDirectoryPath)
+    val items = buildBrowserItems(root, sortOrder, newExpanded, isScanInProgress, scannedPaths, loadingDirectoryPath, scanningDirLiveBytes)
     val totalChildSize = childDirectoryTotalSize(items)
     val newIndex = selectedPath?.let { p ->
         items.indexOfFirst { it.node.path == p }
@@ -227,7 +252,7 @@ fun ExplorerState.withItemDeleted(deletedPath: String): ExplorerState {
 
     // Rebuild browser items from the updated tree so they reference the new nodes
     val updatedItems = updatedScanResult?.let { result ->
-        buildBrowserItems(result.rootNode, sortOrder, updatedExpandedPaths, isScanInProgress, scannedPaths, loadingDirectoryPath)
+        buildBrowserItems(result.rootNode, sortOrder, updatedExpandedPaths, isScanInProgress, scannedPaths, loadingDirectoryPath, scanningDirLiveBytes)
     } ?: emptyList()
 
     val totalChildSize = childDirectoryTotalSize(updatedItems)
@@ -275,7 +300,7 @@ fun ExplorerState.withNodeUpdated(pathToUpdate: String, newNode: FileNode): Expl
 
     // Rebuild browser items from the updated tree so they reference the new nodes
     val updatedItems = updatedScanResult?.let { result ->
-        buildBrowserItems(result.rootNode, sortOrder, expandedPaths, isScanInProgress, scannedPaths, loadingDirectoryPath)
+        buildBrowserItems(result.rootNode, sortOrder, expandedPaths, isScanInProgress, scannedPaths, loadingDirectoryPath, scanningDirLiveBytes)
     } ?: emptyList()
 
     val totalChildSize = childDirectoryTotalSize(updatedItems)
@@ -349,11 +374,22 @@ private fun buildBrowserItems(
     expandedPaths: Set<String> = emptySet(),
     isScanInProgress: Boolean = false,
     scannedPaths: Set<String> = emptySet(),
-    loadingDirectoryPath: String? = null
+    loadingDirectoryPath: String? = null,
+    scanningDirLiveBytes: Long = 0L
 ): List<BrowserItem> {
     val result = mutableListOf<BrowserItem>()
-    val parentTotalSize = root.children.filter(FileNode::isDirectory).sumOf { it.totalSize() }
-    flattenChildren(root, sortOrder, expandedPaths, depth = 0, ancestorIsLast = emptyList(), parentTotalSize = parentTotalSize, isScanInProgress = isScanInProgress, scannedPaths = scannedPaths, loadingDirectoryPath = loadingDirectoryPath, result = result)
+    // Use live bytes for the scanning directory's effective size so that
+    // both sorting and parentTotalSize reflect the in-progress size.
+    val parentTotalSize = root.children.filter(FileNode::isDirectory).sumOf { child ->
+        val isScanning = isScanInProgress && loadingDirectoryPath != null &&
+            (loadingDirectoryPath == child.path || loadingDirectoryPath.startsWith("${child.path}/"))
+        if (isScanning && scanningDirLiveBytes > 0) {
+            scanningDirLiveBytes.coerceAtLeast(child.totalSize())
+        } else {
+            child.totalSize()
+        }
+    }
+    flattenChildren(root, sortOrder, expandedPaths, depth = 0, ancestorIsLast = emptyList(), parentTotalSize = parentTotalSize, isScanInProgress = isScanInProgress, scannedPaths = scannedPaths, loadingDirectoryPath = loadingDirectoryPath, scanningDirLiveBytes = scanningDirLiveBytes, result = result)
     return result
 }
 
@@ -367,10 +403,20 @@ private fun flattenChildren(
     isScanInProgress: Boolean,
     scannedPaths: Set<String>,
     loadingDirectoryPath: String?,
+    scanningDirLiveBytes: Long = 0L,
     result: MutableList<BrowserItem>
 ) {
     val directories = parent.children.filter(FileNode::isDirectory).map { child ->
-        BrowserItem(node = child, totalSize = child.totalSize(), kind = BrowserItemKind.DIRECTORY)
+        // At depth 0, use live bytes for the scanning directory so sorting reflects
+        // the in-progress size rather than the stale tree size.
+        val isScanning = depth == 0 && isScanInProgress && loadingDirectoryPath != null &&
+            (loadingDirectoryPath == child.path || loadingDirectoryPath.startsWith("${child.path}/"))
+        val effectiveSize = if (isScanning && scanningDirLiveBytes > 0) {
+            scanningDirLiveBytes.coerceAtLeast(child.totalSize())
+        } else {
+            child.totalSize()
+        }
+        BrowserItem(node = child, totalSize = effectiveSize, kind = BrowserItemKind.DIRECTORY)
     }
     val files = parent.children.filterNot(FileNode::isDirectory).map { file ->
         BrowserItem(node = file, totalSize = file.totalSize(), kind = BrowserItemKind.FILE)
@@ -420,6 +466,7 @@ private fun flattenChildren(
                 isScanInProgress = isScanInProgress,
                 scannedPaths = scannedPaths,
                 loadingDirectoryPath = loadingDirectoryPath,
+                scanningDirLiveBytes = scanningDirLiveBytes,
                 result = result
             )
         }
