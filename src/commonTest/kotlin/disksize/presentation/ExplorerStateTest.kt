@@ -930,6 +930,59 @@ class ExplorerStateTest {
         assertFalse(dirB.isScanned)
     }
 
+    @Test
+    fun `isScanning is true for unscanned dir matching loadingDirectoryPath`() {
+        val dirA = directory("/root/dirA", "dirA", size = 100)
+        val dirB = directory("/root/dirB", "dirB", size = 200)
+        val root = directory("/root", "root", children = listOf(dirA, dirB))
+        val scanResult = ScanResult(
+            rootPath = "/root",
+            totalSize = root.totalSize(),
+            fileCount = root.fileCount(),
+            directoryCount = root.directoryCount(),
+            rootNode = root,
+            scanDurationMs = 0,
+            errors = emptyList()
+        )
+        // dirA is scanned, dirB is not yet; currently scanning inside dirB
+        val state = ExplorerState(currentPath = "/root", loadingDirectoryPath = "/root/dirB/sub/deep")
+            .withPartialScanResult(scanResult, scannedPaths = setOf("/root/dirA"))
+
+        val itemA = state.browserItems.first { it.node.path == "/root/dirA" }
+        val itemB = state.browserItems.first { it.node.path == "/root/dirB" }
+        assertFalse(itemA.isScanning, "Scanned dirA should not be scanning")
+        assertTrue(itemB.isScanning, "Unscanned dirB matching loadingDirectoryPath should be scanning")
+    }
+
+    @Test
+    fun `isScanning is false when no loadingDirectoryPath`() {
+        val dirA = directory("/root/dirA", "dirA", size = 100)
+        val dirB = directory("/root/dirB", "dirB", size = 200)
+        val root = directory("/root", "root", children = listOf(dirA, dirB))
+        val scanResult = ScanResult(
+            rootPath = "/root",
+            totalSize = root.totalSize(),
+            fileCount = root.fileCount(),
+            directoryCount = root.directoryCount(),
+            rootNode = root,
+            scanDurationMs = 0,
+            errors = emptyList()
+        )
+        val state = ExplorerState(currentPath = "/root")
+            .withPartialScanResult(scanResult, scannedPaths = setOf("/root/dirA"))
+
+        val itemB = state.browserItems.first { it.node.path == "/root/dirB" }
+        assertFalse(itemB.isScanning, "Without loadingDirectoryPath, isScanning should be false")
+    }
+
+    @Test
+    fun `isScanning is false when scan is not in progress`() {
+        val state = stateWithNestedTree()
+        for (item in state.browserItems) {
+            assertFalse(item.isScanning, "isScanning should be false when scan is complete for ${item.node.name}")
+        }
+    }
+
     /**
      * Helper: creates a state with this structure:
      * /root

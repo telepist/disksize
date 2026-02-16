@@ -113,11 +113,19 @@ private fun browserLines(
         add(indicatorLine(width, "↑ ${startIndex} more"))
     }
 
+    val loadingDirPath = state.loadingDirectoryPath
+    val liveBytes = state.scanningDirLiveBytes
     for (index in startIndex until endIndex) {
         if (lines.size >= capacity) break
         val item = items[index]
         val line = when (item.kind) {
-            BrowserItemKind.DIRECTORY -> directoryLine(width, item, index == state.selectedIndex)
+            BrowserItemKind.DIRECTORY -> {
+                val isCurrentlyScanning = item.depth == 0 && !item.isScanned &&
+                    loadingDirPath != null &&
+                    (loadingDirPath == item.node.path || loadingDirPath.startsWith("${item.node.path}/"))
+                val displaySize = if (isCurrentlyScanning) liveBytes.coerceAtLeast(item.totalSize) else item.totalSize
+                directoryLine(width, item, index == state.selectedIndex, state.spinnerFrame, isCurrentlyScanning, displaySize)
+            }
             BrowserItemKind.FILE -> fileLine(width, item, index == state.selectedIndex)
         }
         add(line)
@@ -188,7 +196,7 @@ private fun loadingLines(
     return lines
 }
 
-private fun directoryLine(width: Int, item: BrowserItem, isSelected: Boolean): FrameLine {
+private fun directoryLine(width: Int, item: BrowserItem, isSelected: Boolean, spinnerFrame: Char = ' ', isCurrentlyScanning: Boolean = false, displaySize: Long = item.totalSize): FrameLine {
     val innerWidth = width - 2
     val selector = if (isSelected) ">" else " "
     val node = item.node
@@ -198,14 +206,15 @@ private fun directoryLine(width: Int, item: BrowserItem, isSelected: Boolean): F
         else -> node.name
     }
     val expandIndicator = when {
+        isCurrentlyScanning -> "$spinnerFrame "
         !item.isScanned -> "⋯ "
         item.isExpanded -> "▾ "
         node.isDirectory && node.children.isNotEmpty() -> "▸ "
         else -> "  "
     }
     val totalParentSize = item.parentTotalSize
-    val size = SizeFormatter.format(item.totalSize)
-    val percentage = if (totalParentSize > 0) item.totalSize.toDouble() / totalParentSize * 100 else 0.0
+    val size = SizeFormatter.format(displaySize)
+    val percentage = if (totalParentSize > 0) displaySize.toDouble() / totalParentSize * 100 else 0.0
     val percentStr = formatPercentage(percentage)
     val sizePart = "$size (${percentStr}%)"
 
@@ -214,15 +223,16 @@ private fun directoryLine(width: Int, item: BrowserItem, isSelected: Boolean): F
     val barWidth = max(0, min(PROGRESS_BAR_TARGET, availableForBar / 2))
     val availableForLabel = (innerWidth - sizePart.length - barWidth - 3 - prefixLen).coerceAtLeast(0)
     val labelColor = when {
-        !item.isScanned -> DIM_COLOR
         isSelected -> Color.Green
+        isCurrentlyScanning -> Color.Yellow
+        !item.isScanned -> DIM_COLOR
         node.isDirectory -> Color.Cyan
         else -> Color.White
     }
     val sizeColor = when {
-        item.totalSize >= 1_000_000_000 -> Color.Red
-        item.totalSize >= 100_000_000 -> Color.Yellow
-        item.totalSize >= 10_000_000 -> Color.Cyan
+        displaySize >= 1_000_000_000 -> Color.Red
+        displaySize >= 100_000_000 -> Color.Yellow
+        displaySize >= 10_000_000 -> Color.Cyan
         else -> Color.White
     }
     val prefixColor = if (isSelected) Color.Green else Color.Cyan
