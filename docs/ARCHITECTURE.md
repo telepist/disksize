@@ -151,20 +151,22 @@ sealed class MainScreenEvent {
 ### Source Sets Structure
 ```
 src/
-├── commonMain/           # Platform-independent code (90%)
+├── commonMain/           # Platform-independent code (~90%)
 │   └── kotlin/disksize/
-│       ├── domain/       # All domain logic
-│       ├── ui/           # All UI code
-│       └── presentation/ # Presentation logic
+│       ├── data/         # Repository interfaces
+│       ├── domain/       # Business logic & models
+│       ├── presentation/ # UI state management
+│       ├── ui/           # TUI composable components
+│       └── util/         # Formatting utilities
 ├── commonTest/           # Common tests
-├── nativeMain/           # Shared native code (POSIX)
-│   └── kotlin/disksize/data/
-├── appleMain/            # macOS/iOS specific
-│   └── kotlin/disksize/data/
-├── linuxMain/            # Linux specific
-│   └── kotlin/disksize/data/
-└── mingwMain/            # Windows specific
-    └── kotlin/disksize/data/
+├── posixMain/            # Shared macOS/Linux code (entry point, POSIX repository)
+│   └── kotlin/disksize/
+├── macosArm64Main/       # macOS ARM64 platform glue (FileNodePlatform)
+├── macosX64Main/         # macOS x64 platform glue
+├── linuxX64Main/         # Linux x64 platform glue
+├── linuxArm64Main/       # Linux ARM64 platform glue
+└── mingwX64Main/         # Windows-specific (entry point, Win API repository)
+    └── kotlin/disksize/
 ```
 
 ### Platform Abstraction
@@ -219,12 +221,11 @@ actual class PlatformFileSystem {
 5. **Progress Reporting**: Yield periodically to update UI
 
 ## Dependencies
-- **Mosaic**: TUI framework
-- **Kotlinx.coroutines**: Async/concurrency
-- **JUnit 5**: Test framework
-- **MockK**: Mocking framework
-- **Truth**: Assertion library
-- **Kotlinx.datetime**: Cross-platform date/time (future)
+- **JetBrains Compose** 1.8.0: Compose Multiplatform framework
+- **Mosaic** 0.18.0: TUI rendering on top of Compose
+- **Kotlinx Coroutines** 1.9.0: Async/concurrency
+- **kotlin.test**: Test framework and assertions
+- **kotlinx-coroutines-test**: Coroutine test utilities
 
 ## Build Configuration
 - Separate targets for each platform

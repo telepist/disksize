@@ -33,7 +33,7 @@ sudo mv disksize /usr/local/bin/
 ```bash
 git clone https://github.com/username/disksize.git
 cd disksize
-./gradlew buildTuiRelease
+make build-release
 # Binary will be in build/bin/<platform>/releaseExecutable/
 ```
 
@@ -55,38 +55,43 @@ Analyze home directory:
 disksize ~
 ```
 
-### Command-Line Options
+### Command-Line Usage
 ```
-Usage: disksize [OPTIONS] [PATH]
+Usage: disksize [PATH]
 
 Arguments:
   [PATH]    Directory path to analyze (default: current directory)
-
-Options:
-  -h, --help       Show this help message
-  -v, --version    Show version information
-  --hidden         Include hidden files and directories
-  --follow-links   Follow symbolic links (default: skip)
-  --max-depth N    Limit scan depth to N levels
-  --min-size SIZE  Only show items larger than SIZE (e.g., 1MB, 100KB)
 ```
+
+Note: Command-line flags (--help, --hidden, --max-depth, etc.) are not yet implemented. See the TODO section for planned features.
 
 ## User Interface
 
 ### Screen Layout
 ```
-╔═════════════════════════════════════════════════════════════╗
-║ [1] Header       - Application title and current settings   ║
-╠═════════════════════════════════════════════════════════════╣
-║ [2] Path Bar     - Current directory path                   ║
-╠═════════════════════════════════════════════════════════════╣
-║ [3] Content Area - List of directories and files            ║
-║                    with sizes and percentages               ║
-║                                                             ║
-╠═════════════════════════════════════════════════════════════╣
-║ [4] Status Bar   - Statistics, help hints, messages         ║
-╚═════════════════════════════════════════════════════════════╝
+╔═══════════════════════════════════════════════════════════════╗
+║              DiskSize - Disk Space Analyzer                   ║ ← Title
+╠═══════════════════════════════════════════════════════════════╣
+║Path: /Users/username/Documents                                ║ ← Current path
+║                                                               ║
+║Total Size: 15.2 GB                                            ║ ← Stats
+║Files: 1,234                                                   ║
+║Directories: 156                                               ║
+║                                                               ║
+║Entries (Sort: Size ↓)                                         ║ ← Entry list
+║> ▾ Projects/       8.5 GB (55.9%) ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░ ║
+║  ├── ▸ my-app/     3.2 GB (37.6%) ▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░░░░░░ ║
+║  ...                                                          ║
+║                                                               ║
+╠═══════════════════════════════════════════════════════════════╣
+║Scan completed in 2.3s  Enter: Expand  s: Sort  r: Refresh     ║ ← Status bar
+╚═══════════════════════════════════════════════════════════════╝
 ```
+
+- `>` marks the selected entry (green background highlight)
+- `▾` / `▸` indicate expanded / collapsed directories
+- Tree connectors (`├──`, `└──`) show hierarchy under expanded directories
+- Usage bars show relative size with `▓` (filled) and `░` (empty)
 
 ### Color Coding
 DiskSize uses colors to help you quickly identify large items:
@@ -99,24 +104,30 @@ DiskSize uses colors to help you quickly identify large items:
 
 ## Keyboard Controls
 
-### Navigation (MVP 2 - Available Now)
+### Navigation
 | Key                       | Action                                      |
 |---------------------------|---------------------------------------------|
 | `↑` or `k`                | Move selection up                           |
 | `↓` or `j`                | Move selection down                         |
-| `Enter` or `→` or `l`     | Open the selected directory                 |
-| `Backspace` or `←` or `h` | Navigate to the parent directory            |
+| `Page Up`                 | Move selection up by one page               |
+| `Page Down`               | Move selection down by one page             |
+| `Home`                    | Jump to the first entry                     |
+| `End`                     | Jump to the last entry                      |
+| `Enter`                   | Toggle expand/collapse for directories      |
+| `→` or `l`                | Expand directory or enter if already expanded |
+| `←` or `h`                | Collapse directory or go to parent          |
+| `Backspace`               | Navigate to the parent directory            |
 | `s`                       | Cycle sort order (Size ↓ → Name ↑ → Date ↓) |
 | `r`                       | Refresh (rescan) the current directory      |
 | `Delete`                  | Delete the selected file or directory       |
 | `q`                       | Quit the application                        |
 
-### Advanced Controls (MVP 3)
+### Planned Controls (Not Yet Implemented)
 | Key         | Action                               |
 |-------------|--------------------------------------|
 | `/`         | Search for files/directories         |
 | `f`         | Filter by file type                  |
-| `v`         | Change view mode (tree/list/details) |
+| `v`         | Change view mode                     |
 | `.`         | Toggle hidden files visibility       |
 | `?` or `F1` | Show help screen                     |
 
@@ -133,22 +144,16 @@ Sizes are displayed in human-readable format:
 DiskSize uses binary units (1 KB = 1024 bytes) for accuracy.
 
 ### Percentage Bars
-Each item shows a percentage bar indicating its size relative to the current directory:
+Each directory shows a usage bar indicating its size relative to sibling directories:
 ```
-Projects/    8.5 GB  (55.9%) ████████████
-Photos/      4.2 GB  (27.6%) ██████
-Documents/   1.8 GB  (11.8%) ███
+▾ Projects/       8.5 GB (55.9%) ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░
+▸ Photos/         4.2 GB (27.6%) ▓▓▓▓▓▓▓░░░░░░░░░░░░░░░░░
+▸ Documents/      1.8 GB (11.8%) ▓▓▓░░░░░░░░░░░░░░░░░░░░░
 ```
+Bars use `▓` for the filled portion (magenta) and `░` for empty. When a directory is selected, the bar turns green with `█` characters.
 
-### File Type Icons (MVP 3)
-- 📁 Directory
-- 📄 Regular file
-- 🖼️  Image file (jpg, png, gif, etc.)
-- 🎵 Audio file (mp3, wav, flac, etc.)
-- 🎬 Video file (mp4, avi, mkv, etc.)
-- 📦 Archive (zip, tar, gz, etc.)
-- ⚙️  Executable
-- 📝 Text/Document
+### File Type Icons (Planned)
+File type icons are not yet implemented. Currently, directories are shown with a `/` suffix and files are shown with their full name.
 
 ## Common Tasks
 
@@ -178,14 +183,7 @@ Press `s` to cycle through sort options:
 - **Date ↓ (Descending)**: Recently modified first
 
 ### Filtering by Size
-Only show items larger than a certain size:
-```bash
-# Only show items larger than 100 MB
-disksize --min-size 100MB /path/to/scan
-
-# Only show items larger than 1 GB
-disksize --min-size 1GB ~
-```
+Size filtering via command-line flags is not yet implemented. Items are displayed in the selected sort order, with the largest items shown first by default.
 
 ## Tips and Tricks
 
@@ -272,33 +270,34 @@ A: No. DiskSize runs entirely locally on your machine. No data is transmitted an
 
 ## Getting Help
 
-- **In-app help**: Press `?` or `F1` while running DiskSize
-- **Command-line help**: `disksize --help`
 - **Report issues**: https://github.com/username/disksize/issues
 - **Documentation**: https://github.com/username/disksize/wiki
 
+Note: In-app help (`?` / `F1`) and `--help` are planned but not yet implemented.
+
 ## Version History
 
-### v0.2.0 (MVP 2) - Current
+### Current
 - Interactive keyboard navigation with vim-style shortcuts
+- Page Up/Down, Home/End navigation
+- Tree view with expandable/collapsible directory nodes
 - Directory hierarchy exploration
 - Multiple sort modes (size, name, date)
 - File and directory display
 - Refresh functionality
 - File deletion with confirmation
 - Intelligent caching for snappy navigation
-- Streaming progress updates
+- Streaming progress updates with throughput display
 - Proper symlink handling
-- Color-coded size indicators
+- Color-coded size indicators with percentage bars
+- Green background highlight for selected entry
 - Enhanced status bar with contextual hints
+- Cross-platform: macOS, Linux, Windows
+- Cross-platform install/uninstall via Make
 
-### v0.1.0 (MVP 1)
-- Initial release
-- Basic directory scanning
-- Static display of subdirectories sorted by size
-- macOS support
-
-### Planned Releases
-- v0.3.0 (MVP 3): Tree visualization, percentage bars, file type icons
-- v0.4.0 (MVP 4): Advanced features, search, filter, export
-- v1.0.0 (MVP 5): Production release, all platforms tested
+### Planned
+- File type detection and icons
+- Search and filter
+- Command-line options (--help, --hidden, --max-depth, etc.)
+- Export results (CSV, JSON)
+- In-app help system

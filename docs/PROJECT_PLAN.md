@@ -18,35 +18,39 @@ Build a TreeSize-inspired Terminal User Interface (TUI) application for scanning
 ## What's Done
 
 - Recursive directory scanning with streaming progress and elapsed time
+- Tree view with expandable/collapsible directory nodes and tree-line prefixes
 - Interactive keyboard navigation (arrow keys, vim-style hjkl)
+- Page Up/Down and Home/End navigation
 - Sort by size, name, or date with sort key hints
 - Color-coded sizes with percentage bars
+- Green background highlight for selected entry
 - File and directory listing with symlink detection
 - Refresh current directory with intelligent cache preservation
 - Delete files/directories with confirmation dialog and progress spinner
 - Comprehensive error handling and classification (permission denied, IO errors, not found)
 - Cross-platform: macOS (ARM64/x64), Linux (x64/ARM64), Windows (x64 via MinGW)
 - Adaptive progress tracking with throughput display
-- macOS install/uninstall via Makefile
+- Cross-platform install/uninstall via Makefile with Makefile.local support
 
 ## TODO
 
-- Tree view with indentation and expandable nodes
 - File type detection and icons
 - Multiple view modes (tree, list, details)
 - Search and filter
 - Export results (CSV, JSON)
+- Command-line options (--help, --version, --hidden, --max-depth, --min-size, etc.)
 - Ignore patterns (.gitignore support)
 - Configuration file
 - Parallel scanning
 - In-app help system
-- Binary releases and installation packages for Linux/Windows
+- Binary releases and installation packages
 
 ## Technical Stack
 - **Language**: Kotlin 2.2.20
-- **UI Framework**: Mosaic 0.18.0 (Compose for Terminal)
-- **Build System**: Gradle with Kotlin Multiplatform
-- **Testing**: JUnit 5, MockK, Truth (Google's assertion library)
+- **UI Framework**: JetBrains Compose 1.8.0 + Mosaic 0.18.0 (Compose for Terminal)
+- **Build System**: Gradle with Kotlin Multiplatform + Make
+- **Concurrency**: Kotlinx Coroutines 1.9.0
+- **Testing**: kotlin.test + kotlinx-coroutines-test
 - **Target Platforms**: macOS (ARM64/x64), Linux (x64/ARM64), Windows (x64)
 
 ## Project Structure
@@ -62,20 +66,25 @@ disksize/
 │   ├── commonMain/         # Platform-independent code
 │   │   └── kotlin/
 │   │       └── disksize/
-│   │           ├── domain/      # Business logic
-│   │           ├── ui/          # TUI components
-│   │           └── utils/       # Utilities
+│   │           ├── data/        # Repository interfaces
+│   │           ├── domain/      # Business logic & models
+│   │           ├── presentation/# UI state management
+│   │           ├── ui/          # TUI composable components
+│   │           └── util/        # Formatting utilities
 │   ├── commonTest/         # Common tests
-│   ├── macosMain/          # macOS-specific code
-│   ├── linuxMain/          # Linux-specific code
-│   └── mingwMain/          # Windows-specific code
+│   ├── posixMain/          # Shared macOS/Linux code
+│   ├── macosArm64Main/     # macOS ARM64 platform glue
+│   ├── macosX64Main/       # macOS x64 platform glue
+│   ├── linuxX64Main/       # Linux x64 platform glue
+│   ├── linuxArm64Main/     # Linux ARM64 platform glue
+│   └── mingwX64Main/       # Windows-specific code
 └── README.md               # Project overview
 
 ```
 
 ## Current Status
 
-Core features complete. Next focus: tree visualization and advanced features.
+Core features and tree navigation complete. Next focus: advanced features (search, filter, CLI options).
 
 ## Success Metrics
 - **Performance**: Scan 100GB in under 30 seconds

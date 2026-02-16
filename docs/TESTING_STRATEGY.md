@@ -27,17 +27,16 @@
 ### Dependencies (build.gradle.kts)
 ```kotlin
 sourceSets {
-    commonTest {
+    val commonTest by getting {
         dependencies {
-            implementation(kotlin("test"))
-            implementation("org.jetbrains.kotlin:kotlin-test-junit5")
-            implementation("io.mockk:mockk:1.13.8")
-            implementation("com.google.truth:truth:1.1.5")
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
+            implementation(libs.kotlin.test)
+            implementation(libs.kotlinx.coroutines.test)
         }
     }
 }
 ```
+
+The project uses `kotlin.test` (multiplatform test framework with built-in assertions) and `kotlinx-coroutines-test` 1.9.0 for async testing. No JUnit 5, MockK, or Truth dependencies are used.
 
 ### Test Structure
 ```
@@ -45,20 +44,28 @@ src/
 └── commonTest/
     └── kotlin/
         └── disksize/
+            ├── data/
+            │   ├── FileSystemRepositoryErrorClassificationTest.kt
+            │   └── fake/
+            │       ├── FakeFileSystemRepository.kt
+            │       └── FakeFileSystemRepositoryTest.kt
             ├── domain/
             │   ├── model/
-            │   │   └── FileNodeTest.kt
+            │   │   ├── FileNodeTest.kt
+            │   │   ├── FileNodeTestHelper.kt
+            │   │   └── ScanResultTest.kt
             │   └── usecase/
-            │       ├── ScanDirectoryUseCaseTest.kt
-            │       └── CalculateSizesUseCaseTest.kt
-            ├── data/
-            │   └── repository/
-            │       └── FileSystemRepositoryTest.kt
+            │       ├── DeleteFileUseCaseTest.kt
+            │       └── ScanDirectoryUseCaseTest.kt
             ├── presentation/
-            │   └── MainViewModelTest.kt
-            └── testutil/
-                ├── TestData.kt
-                └── FakeFileSystem.kt
+            │   ├── CrossPlatformPathTest.kt
+            │   └── ExplorerStateTest.kt
+            ├── ui/
+            │   ├── FrameFormattingTest.kt
+            │   └── FrameTextTest.kt
+            └── util/
+                ├── PathUtilsTest.kt
+                └── SizeFormatterTest.kt
 ```
 
 ## Unit Testing
@@ -79,9 +86,7 @@ class FileNodeTest {
             children = listOf(child1, child2)
         )
 
-        val totalSize = parent.totalSize()
-
-        assertThat(totalSize).isEqualTo(300)
+        assertEquals(300, parent.totalSize())
     }
 
     @Test
@@ -93,65 +98,52 @@ class FileNodeTest {
             children = emptyList()
         )
 
-        assertThat(emptyDir.totalSize()).isEqualTo(0)
-        assertThat(emptyDir.isEmpty()).isTrue()
+        assertEquals(0, emptyDir.totalSize())
+        assertTrue(emptyDir.isEmpty())
     }
 }
 ```
 
 ### Use Case Tests
-Test business logic with mocked dependencies:
+Test business logic with fake dependencies:
 
 ```kotlin
 class ScanDirectoryUseCaseTest {
-    private lateinit var repository: FileSystemRepository
+    private lateinit var repository: FakeFileSystemRepository
     private lateinit var useCase: ScanDirectoryUseCase
 
-    @BeforeEach
+    @BeforeTest
     fun setup() {
-        repository = mockk<FileSystemRepository>()
-        useCase = ScanDirectoryUseCaseImpl(repository)
+        repository = FakeFileSystemRepository()
+        useCase = ScanDirectoryUseCase(repository)
     }
 
     @Test
     fun `should scan directory and return result`() = runTest {
         // Given
-        val testPath = "/test/path"
-        val expectedNode = TestData.createFileNode(testPath)
-        every { repository.scanDirectory(testPath) } returns flowOf(
-            DirectoryScanUpdate.Progress(ScanProgress(0, 10, 0, 2)),
-            DirectoryScanUpdate.Complete(
-                FileSystemRepository.DirectoryScanResult(
-                    root = expectedNode,
-                    errors = emptyList()
-                )
-            )
-        )
+        repository.addDirectory("/test/path", children = listOf(
+            FakeEntry("file1.txt", 1024),
+            FakeEntry("file2.txt", 2048)
+        ))
 
         // When
-        val updates = useCase.scan(testPath).toList()
+        val updates = useCase.scan("/test/path").toList()
 
         // Then
         val completed = updates.filterIsInstance<ScanStatus.Completed>().single()
-        assertThat(completed.result.rootNode).isEqualTo(expectedNode)
-        verify(exactly = 1) { repository.scanDirectory(testPath) }
+        assertEquals("/test/path", completed.result.rootPath)
+        assertTrue(completed.result.fileCount > 0)
     }
 
     @Test
     fun `should handle permission denied error`() = runTest {
         // Given
-        val testPath = "/restricted"
-        every { repository.scanDirectory(testPath) } returns flow {
-            throw PermissionDeniedException(testPath)
+        repository.setErrorForPath("/restricted", IOException("Permission denied"))
+
+        // When/Then
+        assertFailsWith<IOException> {
+            useCase.scan("/restricted").toList()
         }
-
-        // When
-        val result = runCatching { useCase.scan(testPath).toList() }
-
-        // Then
-        assertThat(result.isFailure).isTrue()
-        assertThat(result.exceptionOrNull())
-            .isInstanceOf(PermissionDeniedException::class.java)
     }
 }
 ```
@@ -343,7 +335,7 @@ fun `should scan 1000 files in under 1 second`() = runTest {
 ### Measuring Coverage
 ```bash
 # Run tests with coverage (using Kover plugin)
-./gradlew koverHtmlReport
+make test-coverage
 
 # View coverage report
 open build/reports/kover/html/index.html
@@ -408,37 +400,32 @@ fun testScan()
 fun test1()
 ```
 
-## Assertion Library - Truth
+## Assertions - kotlin.test
 
-Use Google Truth for readable assertions:
+Use `kotlin.test` built-in assertions:
 ```kotlin
-// Truth assertions
-assertThat(list).hasSize(5)
-assertThat(list).contains(item)
-assertThat(list).containsExactly(item1, item2, item3).inOrder()
-assertThat(value).isEqualTo(expected)
-assertThat(value).isGreaterThan(100)
-assertThat(result.isSuccess).isTrue()
-assertThat(exception).hasMessageThat().contains("error")
+// kotlin.test assertions
+assertEquals(expected, actual)
+assertTrue(condition)
+assertFalse(condition)
+assertNull(value)
+assertFailsWith<SomeException> { riskyOperation() }
 ```
 
 ## Test Execution
 
 ### Running Tests
 ```bash
-# Run all tests
-./gradlew test
+# Run tests for current platform
+make test
 
-# Run specific test
-./gradlew test --tests "FileNodeTest"
-
-# Run tests for specific platform
-./gradlew macosTest
-./gradlew linuxTest
-./gradlew mingwTest
+# Run tests for specific platform via Gradle
+./gradlew macosArm64Test
+./gradlew linuxX64Test
+./gradlew mingwX64Test
 
 # Run tests with output
-./gradlew test --info
+./gradlew macosArm64Test --info
 ```
 
 ## Test Quality Checklist

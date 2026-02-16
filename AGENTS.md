@@ -1,16 +1,21 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- Shared Kotlin code lives in `src/commonMain/kotlin/disksize/`, split into `domain`, `ui`, and `presentation` packages; keep new modules under the same package tree.
-- Platform adapters sit in `src/<platform>Main/kotlin/`, with entry points in each native target; only add platform-specific code where a shared abstraction is impossible.
+- Shared Kotlin code lives in `src/commonMain/kotlin/disksize/`, split into `data`, `domain`, `presentation`, `ui`, and `util` packages; keep new modules under the same package tree.
+- POSIX shared code (macOS + Linux entry point and repository) lives in `src/posixMain/kotlin/disksize/`.
+- Platform-specific glue sits in `src/<platform>Main/kotlin/` (e.g. `macosArm64Main`, `mingwX64Main`); only add platform-specific code where a shared abstraction is impossible.
 - Tests belong in `src/commonTest/kotlin/` alongside the feature they verify; mirror the production package structure.
 - Architectural docs, UX flows, and plans reside in `docs/`; update the relevant file when behavior or APIs change.
 
 ## Build, Test, and Development Commands
-- `make build` (or `./gradlew buildTui`) compiles the macOS ARM64 debug binary to `build/bin/macosArm64/debugExecutable/disksize.kexe`.
+- `make build` compiles the debug binary for the current platform (auto-detected).
 - `make run` builds and launches the TUI in a real terminal; skip IDE run buttons because Mosaic requires a TTY.
-- `make build-release` or `./gradlew buildTuiRelease` produces the optimized binary in `build/bin/macosArm64/releaseExecutable/`.
-- `./gradlew showExePath` prints the exact output locations, handy when scripting packaging steps.
+- `make build-release` produces the optimized release binary.
+- `make build-all` builds debug binaries for all five platform targets.
+- `make test` runs tests for the current platform.
+- `make test-coverage` runs tests with Kover HTML coverage report.
+- `make install` / `make uninstall` installs or removes the release binary. Create `Makefile.local` with `INSTALL_DIR = /your/path` to override the default install location.
+- Under the hood, Makefile calls `./gradlew linkDebugExecutable<Platform>` / `linkReleaseExecutable<Platform>`.
 
 ## Coding Style & Naming Conventions
 - Follow standard Kotlin style: four-space indentation, trailing commas where idiomatic, and immutable data first.
@@ -20,9 +25,9 @@
 
 ## Testing Guidelines
 - Write tests first (TDD) for new features and bug fixes; add tests when fixing bugs in untested code.
-- Use JUnit 5 with MockK/Truth from `commonTest`; every new feature should ship with unit coverage or higher-level tests.
-- Execute `./gradlew test` before pushing; CI enforces the same command.
-- For coverage verification, run `./gradlew test koverHtmlReport` and review `build/reports/kover/html/index.html`—keep overall coverage ≥80% and domain modules ≥90%.
+- Use `kotlin.test` assertions from `commonTest`; every new feature should ship with unit coverage or higher-level tests.
+- Execute `make test` before pushing.
+- For coverage verification, run `make test-coverage` and review `build/reports/kover/html/index.html`.
 - Name test classes after the subject (`DiskUsageFormatterTest`) and use descriptive `@Test` method names that read like sentences.
 
 ## Commit & Pull Request Guidelines
