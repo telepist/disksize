@@ -139,12 +139,14 @@ sealed class MainScreenEvent {
 ### UI Layer
 
 #### Composable Components
-- `MainScreen`: Root composable, orchestrates entire UI
-- `HeaderBar`: Title and current path display
-- `DirectoryList`: Scrollable list of directories/files
-- `StatusBar`: Statistics and help text
-- `ProgressIndicator`: Scanning progress
-- `ErrorDialog`: Error display
+- `MainScreen`: Root composable, orchestrates entire UI and keyboard handling
+- `FramePrimitives`: Theme object (RGB palette), `frameLine()` (borderless with 1-char left padding), `horizontalRule()`, dialog border functions (rounded corners: ╭─╮│╰─╯)
+- `HeaderSection`: `headerLine()` — compact title + path on one line
+- `StatsSection`: `statsLine()` — stats left-aligned, sort indicator right-aligned
+- `DirectorySection`: Entry list with `▸` selector, eighth-block bars (▏▎▍▌▋▊▉█), tree connectors, size-coded colors
+- `StatusSection`: `statusLine()` — status left, key hints right (key labels bright, descriptions dim)
+- `ScreenBuilder`: Composes layout: header → stats → rule → content → rule → status
+- `ConfirmationDialog`: Centered dialogs with rounded corners for delete confirmation/progress
 
 ## Cross-Platform Strategy
 

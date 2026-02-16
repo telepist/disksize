@@ -69,38 +69,32 @@ Note: Command-line flags (--help, --hidden, --max-depth, etc.) are not yet imple
 
 ### Screen Layout
 ```
-╔═══════════════════════════════════════════════════════════════╗
-║              DiskSize - Disk Space Analyzer                   ║ ← Title
-╠═══════════════════════════════════════════════════════════════╣
-║Path: /Users/username/Documents                                ║ ← Current path
-║                                                               ║
-║Total Size: 15.2 GB                                            ║ ← Stats
-║Files: 1,234                                                   ║
-║Directories: 156                                               ║
-║                                                               ║
-║Entries (Sort: Size ↓)                                         ║ ← Entry list
-║> ▾ Projects/       8.5 GB (55.9%) ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░ ║
-║  ├── ▸ my-app/     3.2 GB (37.6%) ▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░░░░░░ ║
-║  ...                                                          ║
-║                                                               ║
-╠═══════════════════════════════════════════════════════════════╣
-║Scan completed in 2.3s  Enter: Expand  s: Sort  r: Refresh     ║ ← Status bar
-╚═══════════════════════════════════════════════════════════════╝
+ disksize ─── /Users/username/Documents                           ← Title + path
+ 15.2 GB · 1,234 files · 156 dirs                 Sort: Size ↓   ← Stats + sort
+────────────────────────────────────────────────────────────────   ← Divider
+ ▸ ▾ Projects/             8.5 GB  55.9%  ████████▌░░░░░░░░░░░   ← Selected + expanded
+   ├── ▸ my-app/           3.2 GB  37.6%  █████▏░░░░░░░░░░░░░░
+   ├── ▸ website/          2.1 GB  24.7%  ███▎░░░░░░░░░░░░░░░░
+   └── ▸ scripts/        890.5 MB  10.5%  █▍░░░░░░░░░░░░░░░░░░
+   ...
+────────────────────────────────────────────────────────────────   ← Divider
+ ✓ 2.3s               ↑↓ Navigate  Enter Open  s Sort  q Quit    ← Status bar
 ```
 
-- `>` marks the selected entry (green background highlight)
+- `▸` marks the selected entry (teal background highlight)
 - `▾` / `▸` indicate expanded / collapsed directories
-- Tree connectors (`├──`, `└──`) show hierarchy under expanded directories
-- Usage bars show relative size with `▓` (filled) and `░` (empty)
+- Tree connectors (`├──`, `└──`) in dim color show hierarchy under expanded directories
+- Eighth-block bars (▏▎▍▌▋▊▉█) show relative size with sub-character precision
 
 ### Color Coding
-DiskSize uses colors to help you quickly identify large items:
+DiskSize uses an RGB color palette to help you quickly identify large items:
 
-- **Red/Magenta**: Very large items (>1 GB) - Attention needed
-- **Yellow**: Large items (100 MB - 1 GB)
-- **Cyan**: Medium items (10 MB - 100 MB)
-- **White/Grey**: Small items (<10 MB)
-- **Green**: Selected item or success messages
+- **Red** `(255, 100, 100)`: Very large items (≥1 GB) — Attention needed
+- **Amber** `(255, 180, 50)`: Large items (≥100 MB)
+- **Teal** `(0, 190, 190)`: Medium items (≥10 MB)
+- **Gray** `(160, 160, 170)`: Small items (<10 MB)
+- **Teal background**: Selected item highlight
+- **Magenta bars**: Usage proportion; teal when selected
 
 ## Keyboard Controls
 
@@ -146,11 +140,11 @@ DiskSize uses binary units (1 KB = 1024 bytes) for accuracy.
 ### Percentage Bars
 Each directory shows a usage bar indicating its size relative to sibling directories:
 ```
-▾ Projects/       8.5 GB (55.9%) ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░░
-▸ Photos/         4.2 GB (27.6%) ▓▓▓▓▓▓▓░░░░░░░░░░░░░░░░░
-▸ Documents/      1.8 GB (11.8%) ▓▓▓░░░░░░░░░░░░░░░░░░░░░
+▾ Projects/        8.5 GB  55.9%  ████████▌░░░░░░░░░░░░░░░
+▸ Photos/          4.2 GB  27.6%  ████▍░░░░░░░░░░░░░░░░░░░
+▸ Documents/       1.8 GB  11.8%  █▉░░░░░░░░░░░░░░░░░░░░░░
 ```
-Bars use `▓` for the filled portion (magenta) and `░` for empty. When a directory is selected, the bar turns green with `█` characters.
+Bars use eighth-block characters (▏▎▍▌▋▊▉█) for smooth sub-character precision. The filled portion is magenta with a dark background; the empty portion uses dim `░` characters. When a directory is selected, the bar turns bright teal.
 
 ### File Type Icons (Planned)
 File type icons are not yet implemented. Currently, directories are shown with a `/` suffix and files are shown with their full name.
@@ -289,9 +283,9 @@ Note: In-app help (`?` / `F1`) and `--help` are planned but not yet implemented.
 - Intelligent caching for snappy navigation
 - Streaming progress updates with throughput display
 - Proper symlink handling
-- Color-coded size indicators with percentage bars
-- Green background highlight for selected entry
-- Enhanced status bar with contextual hints
+- RGB color palette with size-coded text and eighth-block precision bars
+- Teal background highlight for selected entry
+- Compact status bar with key hints and braille spinner
 - Cross-platform: macOS, Linux, Windows
 - Cross-platform install/uninstall via Make
 

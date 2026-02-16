@@ -9,80 +9,85 @@
 ## User Interface Overview
 
 ### Screen Layout
-The screen is built from these sections, top to bottom:
+The screen uses a borderless, information-dense layout (inspired by gdu/btop):
 
 ```
-╔═══════════════════════════════════════════════════════════════════════════════════╗  ← Top border
-║                          DiskSize - Disk Space Analyzer                           ║  ← Centered title
-╠═══════════════════════════════════════════════════════════════════════════════════╣  ← Separator
-║Path: /Users/username/Documents                                                    ║  ← Path line
-║                                                                                   ║  ← Blank
-║Total Size: 15.2 GB                                                                ║  ← Stats section
-║Files: 1,234                                                                       ║     (3 lines)
-║Directories: 156                                                                   ║
-║                                                                                   ║  ← Blank
-║Entries (Sort: Size ↓)                                                             ║  ← Entry list header
-║> ▾ Projects/                               8.5 GB (55.9%) ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░║  ← Selected + expanded
-║  ├── ▸ my-app/                             3.2 GB (37.6%) ▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░░║  ← Tree children
-║  ├── ▸ website/                            2.1 GB (24.7%) ▓▓▓▓▓▓░░░░░░░░░░░░░░░░░░║            
-║  └── ▸ scripts/                            890 MB (10.5%) ▓▓▓░░░░░░░░░░░░░░░░░░░░░║
-║  ▸ Photos/                                 4.2 GB (27.6%) ▓▓▓▓▓▓▓░░░░░░░░░░░░░░░░░║  ← Collapsed dirs
-║  ▸ Documents/                              1.8 GB (11.8%) ▓▓▓░░░░░░░░░░░░░░░░░░░░░║
-║  ▸ Downloads/                              650 MB (4.3%)  ▓░░░░░░░░░░░░░░░░░░░░░░░║
-║    Music/                                   70 MB (0.5%)                          ║  ← Dir with no children
-║    README.md                                        12 KB                         ║  ← File
-║                                                                                   ║  ← Filler
-╠═══════════════════════════════════════════════════════════════════════════════════╣  ← Separator
-║Scan completed in 2.3s     Enter: Expand  s: Sort  r: Refresh  Del: Delete  q: Quit║  ← Status + key hints
-╚═══════════════════════════════════════════════════════════════════════════════════╝  ← Bottom border
+ disksize ─── /Users/username/Documents                              ← Title + path
+ 15.2 GB · 1,234 files · 156 dirs                    Sort: Size ↓   ← Stats + sort
+──────────────────────────────────────────────────────────────────    ← Horizontal rule
+ ▸ ▾ Projects/                8.5 GB  55.9%  ████████▌░░░░░░░░░░    ← Selected + expanded
+   ├── ▸ my-app/              3.2 GB  37.6%  █████▏░░░░░░░░░░░░░    ← Tree children
+   ├── ▸ website/             2.1 GB  24.7%  ███▎░░░░░░░░░░░░░░░
+   └── ▸ scripts/           890.5 MB  10.5%  █▍░░░░░░░░░░░░░░░░░
+   ▸ Photos/                  4.2 GB  27.6%  ████▍░░░░░░░░░░░░░░    ← Collapsed dirs
+   ▸ Documents/               1.8 GB  11.8%  █▉░░░░░░░░░░░░░░░░░
+   ▸ Downloads/             650.0 MB   4.3%  ▋░░░░░░░░░░░░░░░░░░
+     Music/                  70.0 MB   0.5%                          ← Dir with no children
+     README.md               12.0 KB                                 ← File
+                                                                     ← Filler
+──────────────────────────────────────────────────────────────────    ← Horizontal rule
+ ✓ 2.3s · 5 warnings          ↑↓ Navigate  Enter Open  s Sort  q Quit  ← Status + keys
 ```
+
+**Layout overhead: 5 lines** (header, stats, top rule, bottom rule, status) — the rest is content.
+
+No side borders — content uses full terminal width with 1-char left padding.
 
 ### Entry Indicators
-- `>` marks the currently selected entry (highlighted with green background)
+- `▸` marks the currently selected entry (highlighted with teal background)
 - `▾` expanded directory (Enter to collapse)
 - `▸` collapsed directory with children (Enter to expand)
 - `⋯` directory not yet scanned
-- Spinner (`|`, `/`, `-`, `\`) for directory currently being scanned
-- Tree connectors `├──`, `└──`, `│` show hierarchy under expanded directories
-- Usage bars: `▓` filled (magenta), `█` filled when selected (green), `░` empty
+- Braille spinner (`⠹⢸⣰⣤⣆⡇⠏⠛`) for directory currently being scanned
+- Tree connectors `├──`, `└──`, `│` in dim color show hierarchy under expanded directories
+- Eighth-block bars (▏▎▍▌▋▊▉█) for sub-character precision; magenta filled, dim `░` empty, teal when selected
 
 ### Scanning View
 While the initial scan is in progress, the entry list area shows live progress:
 
 ```
-║Entries (Sort: Size ↓)                                        ║
-║Scanning / /Users/username/Documents                          ║
-║Files: 1,234  Dirs: 42  Size: 2.4 GB                          ║
-║Rate: 125 MB/s                                                ║
-║Current: /Users/username/Documents/Projects/node_modules      ║
+ Scanning ⠹  Files:1.2K  2.4 GB
+ Scanning ⠹ /Users/username/Documents
+ Files: 1,234  Dirs: 42  Size: 2.4 GB
+ Rate: 125 MB/s
+ Current: /Users/username/Documents/Projects/node_modules
 ```
 
 ### Scroll Indicators
 When the entry list is longer than the visible area, scroll indicators appear:
 
 ```
-║↑ 3 more                                                      ║
-║  ...visible entries...                                       ║
-║↓ 12 more                                                     ║
+ ↑ 3 more
+   ...visible entries...
+ ↓ 12 more
 ```
 
 ## Color Scheme
 
+Uses an RGB color palette (via Theme object) for depth and hierarchy.
+
 ### Size-Based Color Coding
-- **Huge (>1GB)**: Red/Magenta - Attention needed
-- **Large (100MB-1GB)**: Yellow - Notable size
-- **Medium (10MB-100MB)**: Cyan - Moderate size
-- **Small (<10MB)**: White/Grey - Normal
+- **Huge (≥1GB)**: Red `(255, 100, 100)` — Attention needed
+- **Large (≥100MB)**: Amber `(255, 180, 50)` — Notable size
+- **Medium (≥10MB)**: Teal `(0, 190, 190)` — Moderate size
+- **Small (<10MB)**: Gray `(160, 160, 170)` — Normal
 
 ### UI Element Colors
-- **Header**: Cyan border and text
-- **Selected Item**: Green background or highlight
-- **Progress Bar**: Green (determinate)
-- **Status Messages**:
-  - Success: Green
-  - Warning: Yellow
-  - Error: Red
-- **Help Text**: Grey/Dim
+- **Title/App name**: Teal `(0, 190, 190)`
+- **Path text**: Light `(200, 200, 210)`
+- **Separator lines**: Dim gray `(60, 60, 70)`
+- **Directory names**: Teal `(0, 190, 190)`
+- **File names**: Light gray `(180, 180, 190)`
+- **Bar filled**: Magenta `(180, 80, 200)`
+- **Bar empty**: Dim `░` characters `(40, 40, 50)`
+- **Bar selected**: Bright teal `(0, 220, 200)`
+- **Selected row bg**: Subtle teal `(0, 35, 40)`
+- **Tree connectors**: Dim `(70, 70, 80)`
+- **Key hints**: Dim `(120, 120, 130)`, key labels bright `(200, 200, 210)`
+- **Status success**: Green `(80, 220, 120)`
+- **Status warning**: Amber `(255, 180, 50)`
+- **Status error**: Red `(255, 100, 100)`
+- **Spinner**: Amber `(255, 180, 50)`
 
 ## Typography & Icons
 
@@ -166,19 +171,18 @@ Errors are handled gracefully without interrupting the user:
 ## Progress Indication
 
 ### Scanning Progress
-Progress is indeterminate - we show actual statistics as the scan proceeds without estimating completion. The entry list area shows live scan feedback:
+Progress is indeterminate — we show actual statistics as the scan proceeds without estimating completion. The entry list area shows live scan feedback:
 
 ```
-Entries (Sort: Size ↓)
-Scanning / /Users/username/Documents/Projects
-Files: 1,234  Dirs: 42  Size: 2.4 GB
-Rate: 125 MB/s
-Current: /Users/username/Documents/Projects/node_modules
+ Scanning ⠹ /Users/username/Documents/Projects
+ Files: 1,234  Dirs: 42  Size: 2.4 GB
+ Rate: 125 MB/s
+ Current: /Users/username/Documents/Projects/node_modules
 ```
 
-The status bar also shows a compact summary with spinner, elapsed time, and throughput:
+The status bar also shows a compact summary with braille spinner, elapsed time, and counts:
 ```
-Scanning / (5s) F:1.2K D:42 2.4 GB                                    q: Quit
+ Scanning ⠹ 5s Files:1.2K 2.4 GB                                    q Quit
 ```
 
 This approach provides honest, real-time feedback without the complexity and inaccuracy of pre-scan estimation or progress bar heuristics.
@@ -198,8 +202,8 @@ This approach provides honest, real-time feedback without the complexity and ina
 ## Feedback & Confirmation
 - Immediate visual feedback for all actions
 - No confirmation dialogs for navigation
-- Deletion requires confirmation via a centered dialog (press `y` to confirm, `n`/`Escape` to cancel)
-- Deletion in progress shows a spinner dialog with item name and size
+- Deletion requires confirmation via a centered dialog with rounded corners (╭─╮│╰─╯); press `y` to confirm, `n`/`Escape` to cancel
+- Deletion in progress shows a braille spinner dialog with item name and size
 - Progress indication for long operations
 - Success/failure messages in status bar
 

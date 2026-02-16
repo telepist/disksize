@@ -56,35 +56,27 @@ disksize ~/Documents
 
 ### Example Output
 ```
-╔═══════════════════════════════════════════════════════════════════════════════════╗
-║                    DiskSize - Disk Space Analyzer                                 ║
-╠═══════════════════════════════════════════════════════════════════════════════════╣
-║Path: /Users/username/Documents                                                    ║
-║                                                                                   ║
-║Total Size: 15.2 GB                                                                ║
-║Files: 1,234                                                                       ║
-║Directories: 156                                                                   ║
-║                                                                                   ║
-║Entries (Sort: Size ↓)                                                             ║
-║> ▾ Projects/                               8.5 GB (55.9%) ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░░░░░░░░░║
-║  ├── ▸ my-app/                             3.2 GB (37.6%) ▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░░║
-║  ├── ▸ website/                            2.1 GB (24.7%) ▓▓▓▓▓▓░░░░░░░░░░░░░░░░░░║
-║  └── ▸ scripts/                            890 MB (10.5%) ▓▓▓░░░░░░░░░░░░░░░░░░░░░║
-║  ▸ Photos/                                 4.2 GB (27.6%) ▓▓▓▓▓▓▓░░░░░░░░░░░░░░░░░║
-║  ▸ Documents/                              1.8 GB (11.8%) ▓▓▓░░░░░░░░░░░░░░░░░░░░░║
-║  ▸ Downloads/                              650 MB (4.3%)  ▓░░░░░░░░░░░░░░░░░░░░░░░║
-║    Music/                                  70 MB (0.5%)                           ║
-║    README.md                               12 KB                                  ║
-║                                                                                   ║
-╠═══════════════════════════════════════════════════════════════════════════════════╣
-║Scan completed in 2.3s     Enter: Expand  s: Sort  r: Refresh  Del: Delete  q: Quit║
-╚═══════════════════════════════════════════════════════════════════════════════════╝
+ disksize ─── ~/Documents
+ 15.2 GB · 1,234 files · 156 dirs                              Sort: Size ↓
+──────────────────────────────────────────────────────────────────────────────
+ ▸ ▾ Projects/                8.5 GB  55.9%  ████████▌░░░░░░░░░░░░░░░
+   ├── ▸ my-app/              3.2 GB  37.6%  █████▏░░░░░░░░░░░░░░░░░░
+   ├── ▸ website/             2.1 GB  24.7%  ███▎░░░░░░░░░░░░░░░░░░░░
+   └── ▸ scripts/           890.5 MB  10.5%  █▍░░░░░░░░░░░░░░░░░░░░░░
+   ▸ Photos/                  4.2 GB  27.6%  ████▍░░░░░░░░░░░░░░░░░░░
+   ▸ Documents/               1.8 GB  11.8%  █▉░░░░░░░░░░░░░░░░░░░░░░
+   ▸ Downloads/             650.0 MB   4.3%  ▋░░░░░░░░░░░░░░░░░░░░░░░
+     Music/                  70.0 MB
+     README.md               12.0 KB
+──────────────────────────────────────────────────────────────────────────────
+ ✓ 2.3s · 5 warnings          ↑↓ Navigate  Enter Open  s Sort  q Quit
 ```
 
-- `>` marks the selected entry (highlighted with a green background)
+- `▸` marks the selected entry (highlighted with a teal background)
 - `▾` expanded directory, `▸` collapsed directory (press Enter to toggle)
-- `├──` / `└──` tree lines show nested items under expanded directories
-- Usage bars show relative size; `▓` filled, `░` empty
+- `├──` / `└──` tree connectors show hierarchy under expanded directories
+- Eighth-block bars (▏▎▍▌▋▊▉█) show relative size with sub-character precision
+- RGB color palette: size-coded text, magenta bars, teal selection highlight
 
 ## What's Done
 
@@ -93,8 +85,8 @@ disksize ~/Documents
 - Interactive keyboard navigation (arrow keys, vim-style `hjkl`)
 - Page Up/Down and Home/End navigation
 - Sort by size, name, or date (`s` key)
-- Color-coded sizes with percentage bars
-- Green background highlight for selected entry
+- RGB color palette with size-coded text and eighth-block precision bars
+- Teal background highlight for selected entry
 - File and directory listing with symlink detection
 - Refresh current directory with cache preservation (`r` key)
 - Delete files/directories with confirmation dialog (Delete key)
