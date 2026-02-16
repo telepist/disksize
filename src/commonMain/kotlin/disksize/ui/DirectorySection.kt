@@ -315,8 +315,8 @@ private fun sizeColorFor(bytes: Long): Color = when {
  * Renders a usage bar using eighth-block characters for sub-character precision.
  * Characters: ▏▎▍▌▋▊▉█ (1/8 through 8/8)
  */
-private fun eighthBlockBar(width: Int, percentage: Double, highlight: Boolean): Segment {
-    if (width <= 0) return Segment("")
+private fun eighthBlockBar(width: Int, percentage: Double, highlight: Boolean): List<Segment> {
+    if (width <= 0) return listOf(Segment(""))
     val eighths = charArrayOf('\u258F', '\u258E', '\u258D', '\u258C', '\u258B', '\u258A', '\u2589', '\u2588')
     // ▏ ▎ ▍ ▌ ▋ ▊ ▉ █
     val totalEighths = (percentage / 100.0 * width * 8).toInt().coerceIn(0, width * 8)
@@ -324,18 +324,23 @@ private fun eighthBlockBar(width: Int, percentage: Double, highlight: Boolean): 
     val remainder = totalEighths % 8
 
     val fg = if (highlight) Theme.barSelected else Theme.barFilled
-    val bg = Theme.barEmpty
-
-    val text = buildString {
+    val filledText = buildString {
         repeat(fullBlocks) { append('\u2588') }  // █
         if (remainder > 0 && fullBlocks < width) {
             append(eighths[remainder - 1])
         }
-        val used = fullBlocks + (if (remainder > 0 && fullBlocks < width) 1 else 0)
-        repeat((width - used).coerceAtLeast(0)) { append(' ') }
     }
+    val used = fullBlocks + (if (remainder > 0 && fullBlocks < width) 1 else 0)
+    val emptyCount = (width - used).coerceAtLeast(0)
 
-    return Segment(text, fg, bg)
+    val segments = mutableListOf<Segment>()
+    if (filledText.isNotEmpty()) {
+        segments += Segment(filledText, fg, Theme.barEmpty)
+    }
+    if (emptyCount > 0) {
+        segments += Segment("\u2591".repeat(emptyCount), Theme.barEmpty)  // ░
+    }
+    return segments
 }
 
 private fun indicatorLine(width: Int, message: String): FrameLine =

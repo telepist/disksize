@@ -508,7 +508,9 @@ enum class SortOrder(val label: String) {
     }
 }
 
-private val SPINNER_FRAMES = "|/-\\".toCharArray()
+private val SPINNER_FRAMES = charArrayOf(
+    '\u2839', '\u28B8', '\u28F0', '\u28E4', '\u28C6', '\u2847', '\u280F', '\u281B',
+) // ⠹⢸⣰⣤⣆⡇⠏⠛ – 4 braille dots circling clockwise
 
 /** True when [this] path is a direct or nested child of [parent] (handles both `/` and `\`). */
 internal fun String.isSubPathOf(parent: String): Boolean =
