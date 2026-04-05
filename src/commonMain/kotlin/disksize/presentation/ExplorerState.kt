@@ -229,6 +229,11 @@ fun ExplorerState.cancelConfirmDelete(): ExplorerState {
     return copy(confirmDeleteItem = null, isDeletingInProgress = false)
 }
 
+/** Sets an error message without clearing scan results — use for non-fatal errors like delete failures. */
+fun ExplorerState.withTransientError(message: String): ExplorerState {
+    return copy(errorMessage = message)
+}
+
 fun ExplorerState.startDeleting(): ExplorerState {
     return copy(isDeletingInProgress = true)
 }

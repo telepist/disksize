@@ -39,7 +39,10 @@ internal fun statusLine(state: ExplorerState, width: Int): FrameLine {
                 leftSegments += Segment(" ${SizeFormatter.format(progress.scannedBytes)}", Theme.pathText)
             }
         }
-        state.errorMessage != null -> {
+        state.errorMessage != null && state.scanResult == null -> {
+            leftSegments += Segment("Error: ${state.errorMessage.take(innerWidth / 2)}", Theme.statusError)
+        }
+        state.errorMessage != null && state.scanResult != null -> {
             leftSegments += Segment("Error: ${state.errorMessage.take(innerWidth / 2)}", Theme.statusError)
         }
         state.scanResult != null -> {

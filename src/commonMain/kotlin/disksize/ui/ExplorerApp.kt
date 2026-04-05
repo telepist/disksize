@@ -23,6 +23,7 @@ import disksize.presentation.startDeleting
 import disksize.presentation.tickSpinner
 import disksize.presentation.withConfirmDelete
 import disksize.presentation.withError
+import disksize.presentation.withTransientError
 import disksize.presentation.withItemDeleted
 import disksize.presentation.withLoading
 import disksize.presentation.withNodeUpdated
@@ -200,13 +201,16 @@ fun DiskSizeApp(
                         history = history.map { it.withItemDeleted(itemToDelete.node.path) }
                     }
                     is DeletionResult.Failure -> {
-                        state = state.cancelConfirmDelete().withError(result.message)
+                        state = state.cancelConfirmDelete().withTransientError(result.message)
                     }
                 }
             }
         },
         onCancelDelete = {
             state = state.cancelConfirmDelete()
+        },
+        onClearError = {
+            state = state.copy(errorMessage = null)
         },
         onQuit = {
             throw ExitException()

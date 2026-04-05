@@ -26,6 +26,7 @@ fun MainScreen(
     onRequestDelete: () -> Unit,
     onConfirmDelete: () -> Unit,
     onCancelDelete: () -> Unit,
+    onClearError: () -> Unit,
     onQuit: () -> Unit
 ) {
     val terminalState = LocalTerminalState.current
@@ -56,6 +57,7 @@ fun MainScreen(
                 requestDelete = onRequestDelete,
                 confirmDelete = onConfirmDelete,
                 cancelDelete = onCancelDelete,
+                clearError = onClearError,
                 quit = onQuit
             )
         }
@@ -78,6 +80,7 @@ private fun handleKey(
     requestDelete: () -> Unit,
     confirmDelete: () -> Unit,
     cancelDelete: () -> Unit,
+    clearError: () -> Unit,
     quit: () -> Unit
 ): Boolean {
     // If deletion is in progress, ignore all keys
@@ -100,6 +103,11 @@ private fun handleKey(
             "q", "Q" -> { quit(); true }
             else -> false
         }
+    }
+
+    // Clear transient error on any key press
+    if (state.errorMessage != null && state.scanResult != null) {
+        clearError()
     }
 
     // Normal navigation and operations

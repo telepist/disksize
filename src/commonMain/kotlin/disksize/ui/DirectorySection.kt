@@ -41,7 +41,7 @@ internal fun directorySection(state: ExplorerState, width: Int, maxRows: Int): L
 
     when {
         state.isLoading -> lines += loadingLines(state, width, innerWidth, remainingCapacity())
-        state.errorMessage != null -> {
+        state.errorMessage != null && state.scanResult == null -> {
             val message = state.errorMessage.take(innerWidth - 2)
             add(frameLine(width, listOf(Segment("Error: $message", Theme.statusError))))
         }
