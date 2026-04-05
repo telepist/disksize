@@ -156,8 +156,8 @@ class ExplorerStateTest {
         var state = ExplorerState(currentPath = "/tmp").withLoading("/tmp")
         state = state.tickSpinner()
         assertEquals(1, state.spinnerIndex)
-        val nextFrame = state.spinnerFrame
-        assertTrue(nextFrame in charArrayOf('|', '/', '-', '\\'))
+        // spinnerFrame should be a valid braille spinner character
+        assertTrue(state.spinnerFrame.code in 0x2800..0x28FF)
     }
 
     @Test

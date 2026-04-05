@@ -58,32 +58,22 @@ internal fun statusLine(state: ExplorerState, width: Int): FrameLine {
     }
 
     // Right side: key hints
-    when {
-        state.isLoading -> {
-            rightSegments += keyHint("q", "Quit")
-        }
-        state.isScanInProgress -> {
-            rightSegments += keyHint("\u2191\u2193", "Navigate")  // ↑↓
-            rightSegments += Segment("  ")
-            rightSegments += keyHint("Enter", "Open")
-            rightSegments += Segment("  ")
-            rightSegments += keyHint("s", "Sort")
-            rightSegments += Segment("  ")
-            rightSegments += keyHint("q", "Quit")
-        }
-        else -> {
-            rightSegments += keyHint("\u2191\u2193", "Navigate")  // ↑↓
-            rightSegments += Segment("  ")
-            rightSegments += keyHint("Enter", "Open")
-            rightSegments += Segment("  ")
-            rightSegments += keyHint("s", "Sort")
-            rightSegments += Segment("  ")
+    if (state.isLoading && state.browserItems.isEmpty()) {
+        rightSegments += keyHint("q", "Quit")
+    } else {
+        rightSegments += keyHint("\u2191\u2193", "Navigate")  // ↑↓
+        rightSegments += Segment("  ")
+        rightSegments += keyHint("Enter", "Open")
+        rightSegments += Segment("  ")
+        rightSegments += keyHint("s", "Sort")
+        rightSegments += Segment("  ")
+        if (!state.isScanInProgress) {
             rightSegments += keyHint("r", "Refresh")
             rightSegments += Segment("  ")
-            rightSegments += keyHint("Del", "Delete")
-            rightSegments += Segment("  ")
-            rightSegments += keyHint("q", "Quit")
         }
+        rightSegments += keyHint("Del", "Delete")
+        rightSegments += Segment("  ")
+        rightSegments += keyHint("q", "Quit")
     }
 
     val leftLen = leftSegments.sumOf { it.text.length }

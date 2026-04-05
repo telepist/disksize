@@ -2,44 +2,25 @@ package disksize.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import disksize.domain.FileTreeStore
 import disksize.domain.model.DeletionResult
-import disksize.domain.model.FileNode
-import disksize.domain.model.ScanError
-import disksize.domain.model.ScanResult
-import disksize.domain.model.ScanStatus
+import disksize.domain.model.FileTreeState
+import disksize.domain.model.ScanPhase
 import disksize.domain.usecase.DeleteFileUseCase
 import disksize.domain.usecase.ScanDirectoryUseCase
-import disksize.presentation.ExplorerState
-import disksize.presentation.cancelConfirmDelete
 import disksize.presentation.BrowserItemKind
+import disksize.presentation.UiSelections
+import disksize.presentation.deriveExplorerState
 import disksize.presentation.findParentIndex
-import disksize.presentation.resetSelection
-import disksize.presentation.startDeleting
-import disksize.presentation.tickSpinner
-import disksize.presentation.withConfirmDelete
-import disksize.presentation.withError
-import disksize.presentation.withTransientError
-import disksize.presentation.withItemDeleted
-import disksize.presentation.withLoading
-import disksize.presentation.withNodeUpdated
-import disksize.presentation.withPartialScanResult
-import disksize.presentation.withScanResult
-import disksize.presentation.withSelection
-import disksize.presentation.withNextSortOrder
-import disksize.presentation.withProgress
-import disksize.presentation.withToggleExpand
 import disksize.util.normalizePath
 import disksize.util.parentPath
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
 
 /**
@@ -50,72 +31,58 @@ import kotlinx.coroutines.launch
  */
 class ExitException : RuntimeException("exit")
 
+data class HistoryEntry(
+    val treeState: FileTreeState,
+    val selectedIndex: Int,
+    val sortOrder: disksize.presentation.SortOrder,
+    val expandedPaths: Set<String>
+)
+
 @Composable
 fun DiskSizeApp(
     initialPath: String,
     scanDirectoryUseCase: ScanDirectoryUseCase,
-    deleteFileUseCase: DeleteFileUseCase
+    deleteFileUseCase: DeleteFileUseCase,
+    store: FileTreeStore
 ) {
-    var state by remember {
-        mutableStateOf(ExplorerState(currentPath = initialPath, isLoading = true))
-    }
+    val treeState by store.state.collectAsState()
+    var ui by remember { mutableStateOf(UiSelections()) }
     var pendingScan by remember { mutableStateOf<String?>(initialPath) }
-    var history by remember { mutableStateOf(emptyList<ExplorerState>()) }
+    var history by remember { mutableStateOf(emptyList<HistoryEntry>()) }
     val scope = rememberCoroutineScope()
 
-    LaunchedEffect(Unit) {
-        awaitCancellation()
+    // Derive the full ExplorerState reactively
+    val state = remember(treeState, ui) {
+        deriveExplorerState(treeState, ui)
     }
 
+    // Scan effect — launches scan and pushes updates into the store
     LaunchedEffect(pendingScan) {
         val path = pendingScan ?: return@LaunchedEffect
-        // Detect if this is a refresh (same path) vs navigation (different path)
-        val isRefresh = (path == state.currentPath)
-        state = state.withLoading(path)
-        val result = try {
-            scanDirectoryUseCase
-                .scan(path)
-                .flowOn(Dispatchers.Default)
-                .collect { update ->
-                when (update) {
-                    is ScanStatus.Progress -> {
-                        state = state.withProgress(update.value)
-                    }
-                    is ScanStatus.PartialResult -> {
-                        state = state.withPartialScanResult(update.result, update.scannedPaths)
-                    }
-                    is ScanStatus.Completed -> {
-                        state = state.withScanResult(update.result).resetSelection()
-                        // Update history if this is a refresh to keep parent cache in sync
-                        if (isRefresh && history.isNotEmpty()) {
-                            history = history.map { it.withNodeUpdated(path, update.result.rootNode) }
-                        }
-                    }
-                }
-            }
-            null
+        ui = ui.copy(selectedIndex = 0, expandedPaths = emptySet(), errorMessage = null)
+        try {
+            scanDirectoryUseCase.scanInto(path, store)
         } catch (e: ExitException) {
             throw e
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (throwable: Throwable) {
-            throwable
-        }
-        result?.let { error ->
-            val message = error.message ?: "Failed to scan $path"
-            state = state.withError(message)
+            store.setError(throwable.message ?: "Failed to scan $path")
         }
         pendingScan = null
-        // Only clear history when navigating to a different directory, not when refreshing
-        if (!isRefresh) {
-            history = emptyList()
-        }
     }
 
-    LaunchedEffect(state.isLoading, state.isScanInProgress, state.isDeletingInProgress, pendingScan) {
-        if (!state.isLoading && !state.isScanInProgress && !state.isDeletingInProgress) return@LaunchedEffect
+    // Spinner animation
+    LaunchedEffect(treeState.scanPhase, ui.isDeletingInProgress) {
+        val needsSpinner = treeState.scanPhase == ScanPhase.LOADING ||
+            treeState.scanPhase == ScanPhase.SCANNING ||
+            ui.isDeletingInProgress
+        if (!needsSpinner) return@LaunchedEffect
         while (true) {
             delay(120)
-            if (!state.isLoading && !state.isScanInProgress && !state.isDeletingInProgress) break
-            state = state.tickSpinner()
+            ui = ui.copy(spinnerIndex = ui.spinnerIndex + 1)
+            val phase = store.state.value.scanPhase
+            if (phase != ScanPhase.LOADING && phase != ScanPhase.SCANNING && !ui.isDeletingInProgress) break
         }
     }
 
@@ -124,49 +91,59 @@ fun DiskSizeApp(
         onMoveSelection = { delta ->
             val items = state.browserItems
             if (items.isEmpty()) return@MainScreen
-            val next = state.selectedIndex + delta
+            val next = ui.selectedIndex + delta
             val bounded = next.coerceIn(0, items.lastIndex)
-            if (bounded != state.selectedIndex) {
-                state = state.withSelection(bounded)
+            if (bounded != ui.selectedIndex) {
+                ui = ui.copy(selectedIndex = bounded)
             }
         },
         onToggleExpand = {
             val selectedItem = state.browserItems.getOrNull(state.selectedIndex) ?: return@MainScreen
             if (!selectedItem.node.isDirectory) return@MainScreen
-            state = state.withToggleExpand(selectedItem.node.path)
+            val path = selectedItem.node.path
+            val newExpanded = if (path in ui.expandedPaths) {
+                ui.expandedPaths.filterNot { p -> p == path || p.isSubPathOf(path) }.toSet()
+            } else {
+                ui.expandedPaths + path
+            }
+            ui = ui.copy(expandedPaths = newExpanded)
         },
         onExpandOrEnter = {
             val selectedItem = state.browserItems.getOrNull(state.selectedIndex) ?: return@MainScreen
             if (!selectedItem.node.isDirectory) return@MainScreen
             if (selectedItem.isExpanded) {
-                // Already expanded — move to first child
                 val nextIndex = state.selectedIndex + 1
                 if (nextIndex < state.browserItems.size && state.browserItems[nextIndex].depth > selectedItem.depth) {
-                    state = state.withSelection(nextIndex)
+                    ui = ui.copy(selectedIndex = nextIndex)
                 }
             } else {
-                state = state.withToggleExpand(selectedItem.node.path)
+                ui = ui.copy(expandedPaths = ui.expandedPaths + selectedItem.node.path)
             }
         },
         onCollapseOrParent = {
             val selectedItem = state.browserItems.getOrNull(state.selectedIndex) ?: return@MainScreen
             if (selectedItem.kind == BrowserItemKind.DIRECTORY && selectedItem.isExpanded) {
-                // Collapse this directory
-                state = state.withToggleExpand(selectedItem.node.path)
+                val path = selectedItem.node.path
+                ui = ui.copy(
+                    expandedPaths = ui.expandedPaths.filterNot { p -> p == path || p.isSubPathOf(path) }.toSet()
+                )
             } else {
-                // Jump to parent item in tree
-                val parentIdx = state.findParentIndex(state.selectedIndex)
+                val parentIdx: Int? = state.findParentIndex(state.selectedIndex)
                 if (parentIdx != null) {
-                    state = state.withSelection(parentIdx)
+                    ui = ui.copy(selectedIndex = parentIdx)
                 }
-                // If depth 0, do nothing (Backspace handles going up)
             }
         },
         onNavigateUp = {
             if (history.isNotEmpty()) {
                 val previous = history.last()
                 history = history.dropLast(1)
-                state = previous
+                store.restore(previous.treeState)
+                ui = ui.copy(
+                    selectedIndex = previous.selectedIndex,
+                    sortOrder = previous.sortOrder,
+                    expandedPaths = previous.expandedPaths
+                )
                 pendingScan = null
             } else {
                 val parent = parentPath(state.currentPath) ?: return@MainScreen
@@ -174,43 +151,42 @@ fun DiskSizeApp(
             }
         },
         onCycleSort = {
-            state = state.withNextSortOrder()
+            ui = ui.copy(sortOrder = ui.sortOrder.next())
         },
         onRefresh = {
             if (!state.isScanInProgress) {
-                // Trigger a rescan of the current directory
                 pendingScan = state.currentPath
-                // History will be preserved and updated to reflect new scan results
             }
         },
         onRequestDelete = {
-            if (!state.isScanInProgress) {
-                val selectedItem = state.browserItems.getOrNull(state.selectedIndex) ?: return@MainScreen
-                state = state.withConfirmDelete(selectedItem)
-            }
+            val selectedItem = state.browserItems.getOrNull(state.selectedIndex) ?: return@MainScreen
+            ui = ui.copy(confirmDeleteItem = selectedItem)
         },
         onConfirmDelete = {
-            val itemToDelete = state.confirmDeleteItem ?: return@MainScreen
-            state = state.startDeleting()
+            val itemToDelete = ui.confirmDeleteItem ?: return@MainScreen
+            ui = ui.copy(isDeletingInProgress = true)
             scope.launch {
                 val result = deleteFileUseCase.delete(itemToDelete.node.path)
                 when (result) {
                     is DeletionResult.Success -> {
-                        state = state.withItemDeleted(itemToDelete.node.path)
-                        // Update history to remove deleted item from all cached states
-                        history = history.map { it.withItemDeleted(itemToDelete.node.path) }
+                        store.removeNode(itemToDelete.node.path)
+                        ui = ui.copy(confirmDeleteItem = null, isDeletingInProgress = false)
                     }
                     is DeletionResult.Failure -> {
-                        state = state.cancelConfirmDelete().withTransientError(result.message)
+                        ui = ui.copy(
+                            confirmDeleteItem = null,
+                            isDeletingInProgress = false,
+                            errorMessage = result.message
+                        )
                     }
                 }
             }
         },
         onCancelDelete = {
-            state = state.cancelConfirmDelete()
+            ui = ui.copy(confirmDeleteItem = null, isDeletingInProgress = false)
         },
         onClearError = {
-            state = state.copy(errorMessage = null)
+            ui = ui.copy(errorMessage = null)
         },
         onQuit = {
             throw ExitException()
@@ -218,22 +194,5 @@ fun DiskSizeApp(
     )
 }
 
-private fun explorerStateFromNode(
-    previousState: ExplorerState,
-    node: FileNode,
-    errors: List<ScanError>
-): ExplorerState {
-    val scanResult = ScanResult(
-        rootPath = node.path,
-        totalSize = node.totalSize(),
-        fileCount = node.fileCount(),
-        directoryCount = node.directoryCount(),
-        rootNode = node,
-        scanDurationMs = 0,
-        errors = errors
-    )
-    return ExplorerState(
-        currentPath = node.path,
-        sortOrder = previousState.sortOrder
-    ).withScanResult(scanResult)
-}
+private fun String.isSubPathOf(parent: String): Boolean =
+    startsWith("$parent/") || startsWith("$parent\\")

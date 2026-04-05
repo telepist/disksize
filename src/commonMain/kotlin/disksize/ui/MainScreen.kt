@@ -97,8 +97,8 @@ private fun handleKey(
         }
     }
 
-    // If scanning is in progress, only allow quit
-    if (state.isLoading) {
+    // Initial loading with no items yet — only allow quit
+    if (state.isLoading && state.browserItems.isEmpty()) {
         return when (event.key) {
             "q", "Q" -> { quit(); true }
             else -> false
@@ -110,7 +110,7 @@ private fun handleKey(
         clearError()
     }
 
-    // Normal navigation and operations
+    // Normal navigation and operations (work during scanning too)
     return when (event.key) {
         "ArrowDown", "j" -> { moveSelection(1); true }
         "ArrowUp", "k" -> { moveSelection(-1); true }
@@ -124,7 +124,7 @@ private fun handleKey(
         "Backspace" -> { navigateUp(); true }
         "s", "S" -> { cycleSort(); true }
         "r", "R" -> { if (!state.isScanInProgress) refresh(); true }
-        "Delete" -> { if (!state.isScanInProgress) requestDelete(); true }
+        "Delete" -> { requestDelete(); true }
         "q", "Q" -> { quit(); true }
         else -> false
     }

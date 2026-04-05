@@ -2,18 +2,47 @@ package disksize.domain.usecase
 
 import disksize.data.DirectoryScanUpdate
 import disksize.data.FileSystemRepository
+import disksize.domain.FileTreeStore
 import disksize.domain.model.ScanResult
 import disksize.domain.model.ScanStatus
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlin.time.TimeSource
 
 class ScanDirectoryUseCase(
     private val repository: FileSystemRepository
 ) {
+    /**
+     * Scan a directory and push updates into the reactive [store].
+     * The store's state flow will automatically update subscribers (UI).
+     * Cancellation-safe: if the coroutine is cancelled mid-scan, the store
+     * retains whatever partial state was last applied.
+     */
+    suspend fun scanInto(path: String, store: FileTreeStore) {
+        store.reset(path)
+        repository.scanDirectory(path).flowOn(Dispatchers.Default).collect { update ->
+            when (update) {
+                is DirectoryScanUpdate.Progress -> store.updateProgress(update.progress)
+                is DirectoryScanUpdate.PartialTree -> {
+                    currentCoroutineContext().ensureActive()
+                    store.applyPartialTree(update.root, update.scannedPaths, update.errors)
+                }
+                is DirectoryScanUpdate.Complete -> {
+                    currentCoroutineContext().ensureActive()
+                    val startMark = store.state.value.scanStartTimeMark
+                    val duration = startMark?.elapsedNow()?.inWholeMilliseconds ?: 0L
+                    store.applyComplete(update.result.root, update.result.errors, duration)
+                }
+            }
+        }
+    }
+
+    /** Flow-based scan for backward compatibility and testing. */
     fun scan(path: String): Flow<ScanStatus> = flow {
         val startTime = TimeSource.Monotonic.markNow()
 

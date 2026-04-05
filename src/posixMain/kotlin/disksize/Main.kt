@@ -2,6 +2,7 @@ package disksize
 
 import com.jakewharton.mosaic.runMosaic
 import disksize.data.PosixFileSystemRepository
+import disksize.domain.FileTreeStore
 import disksize.domain.usecase.DeleteFileUseCase
 import disksize.domain.usecase.ScanDirectoryUseCase
 import disksize.ui.DiskSizeApp
@@ -30,13 +31,15 @@ fun main(args: Array<String>) {
         val repository = PosixFileSystemRepository()
         val scanUseCase = ScanDirectoryUseCase(repository)
         val deleteUseCase = DeleteFileUseCase(repository)
+        val store = FileTreeStore()
 
         try {
             runMosaic {
                 DiskSizeApp(
                     initialPath = targetPath,
                     scanDirectoryUseCase = scanUseCase,
-                    deleteFileUseCase = deleteUseCase
+                    deleteFileUseCase = deleteUseCase,
+                    store = store
                 )
             }
         } catch (_: ExitException) {

@@ -213,20 +213,23 @@ class CrossPlatformPathTest {
         val dirA = winDirectory("C:\\root\\dirA", "dirA", size = 100)
         val dirB = winDirectory("C:\\root\\dirB", "dirB", size = 200)
         val root = winDirectory("C:\\root", "root", children = listOf(dirA, dirB))
-        val result = scanResult("C:\\root", root)
 
         // Simulate: scanning inside dirB, live bytes accumulated to 500
-        val state = ExplorerState(
-            currentPath = "C:\\root",
-            loadingDirectoryPath = "C:\\root\\dirB\\deep\\sub",
-            loadingProgress = LoadingProgress(
+        val tree = disksize.domain.model.FileTreeState(
+            rootPath = "C:\\root",
+            rootNode = root,
+            scanPhase = disksize.domain.model.ScanPhase.SCANNING,
+            scannedPaths = setOf("C:\\root\\dirA"),
+            scanProgress = disksize.domain.model.ScanProgress(
                 processedFiles = 10,
                 processedDirectories = 5,
                 scannedBytes = 500,
-                bytesPerSecond = 100
+                bytesPerSecond = 100,
+                currentDirectory = "C:\\root\\dirB\\deep\\sub"
             ),
-            scanningDirBaseBytes = 0
-        ).withPartialScanResult(result, scannedPaths = setOf("C:\\root\\dirA"))
+            lastPartialScannedBytes = 0
+        )
+        val state = deriveExplorerState(tree, UiSelections())
 
         // dirB should use live bytes (500) instead of stale tree size (200)
         val itemB = state.browserItems.first { it.node.path == "C:\\root\\dirB" }
@@ -244,19 +247,22 @@ class CrossPlatformPathTest {
         val dirA = winDirectory("C:\\root\\dirA", "dirA", size = 300)
         val dirB = winDirectory("C:\\root\\dirB", "dirB", size = 100)
         val root = winDirectory("C:\\root", "root", children = listOf(dirA, dirB))
-        val result = scanResult("C:\\root", root)
 
-        val state = ExplorerState(
-            currentPath = "C:\\root",
-            loadingDirectoryPath = "C:\\root\\dirB\\sub",
-            loadingProgress = LoadingProgress(
+        val tree = disksize.domain.model.FileTreeState(
+            rootPath = "C:\\root",
+            rootNode = root,
+            scanPhase = disksize.domain.model.ScanPhase.SCANNING,
+            scannedPaths = setOf("C:\\root\\dirA"),
+            scanProgress = disksize.domain.model.ScanProgress(
                 processedFiles = 10,
                 processedDirectories = 5,
                 scannedBytes = 500,
-                bytesPerSecond = 100
+                bytesPerSecond = 100,
+                currentDirectory = "C:\\root\\dirB\\sub"
             ),
-            scanningDirBaseBytes = 0
-        ).withPartialScanResult(result, scannedPaths = setOf("C:\\root\\dirA"))
+            lastPartialScannedBytes = 0
+        )
+        val state = deriveExplorerState(tree, UiSelections())
 
         // With SIZE_DESC sort, dirB (500 live bytes) should come before dirA (300)
         val names = state.browserItems.filter { it.kind == BrowserItemKind.DIRECTORY }.map { it.node.name }
