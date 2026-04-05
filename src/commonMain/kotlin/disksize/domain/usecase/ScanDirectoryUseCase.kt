@@ -15,7 +15,8 @@ import kotlinx.coroutines.flow.flowOn
 import kotlin.time.TimeSource
 
 class ScanDirectoryUseCase(
-    private val repository: FileSystemRepository
+    private val repository: FileSystemRepository,
+    private val scanDispatcher: kotlinx.coroutines.CoroutineDispatcher = Dispatchers.Default
 ) {
     /**
      * Scan a directory and push updates into the reactive [store].
@@ -25,7 +26,7 @@ class ScanDirectoryUseCase(
      */
     suspend fun scanInto(path: String, store: FileTreeStore) {
         store.reset(path)
-        repository.scanDirectory(path).flowOn(Dispatchers.Default).collect { update ->
+        repository.scanDirectory(path).flowOn(scanDispatcher).collect { update ->
             when (update) {
                 is DirectoryScanUpdate.Progress -> store.updateProgress(update.progress)
                 is DirectoryScanUpdate.PartialTree -> {

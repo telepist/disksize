@@ -5,6 +5,7 @@ import disksize.data.PosixFileSystemRepository
 import disksize.domain.FileTreeStore
 import disksize.domain.usecase.DeleteFileUseCase
 import disksize.domain.usecase.ScanDirectoryUseCase
+import disksize.presentation.ExplorerViewModel
 import disksize.ui.DiskSizeApp
 import disksize.ui.ExitException
 import kotlinx.cinterop.ByteVar
@@ -12,6 +13,8 @@ import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.allocArray
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.toKString
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import platform.posix.PATH_MAX
 import platform.posix.getcwd
@@ -32,14 +35,13 @@ fun main(args: Array<String>) {
         val scanUseCase = ScanDirectoryUseCase(repository)
         val deleteUseCase = DeleteFileUseCase(repository)
         val store = FileTreeStore()
+        val viewModel = ExplorerViewModel(scanUseCase, deleteUseCase, store, CoroutineScope(Dispatchers.Default))
 
         try {
             runMosaic {
                 DiskSizeApp(
                     initialPath = targetPath,
-                    scanDirectoryUseCase = scanUseCase,
-                    deleteFileUseCase = deleteUseCase,
-                    store = store
+                    viewModel = viewModel
                 )
             }
         } catch (_: ExitException) {
