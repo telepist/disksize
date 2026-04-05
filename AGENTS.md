@@ -19,7 +19,7 @@
 
 ## Coding Style & Naming Conventions
 - Follow standard Kotlin style: four-space indentation, trailing commas where idiomatic, and immutable data first.
-- Keep packages under `disksize.<layer>` (for example `disksize.domain.scan`); name use cases `*UseCase`, presenters `*Presenter`, and composables or views `*View`.
+- Keep packages under `disksize.<layer>` (for example `disksize.domain.scan`); name use cases `*UseCase`, view models `*ViewModel`, and composables or views `*View`.
 - Prefer small public APIs; surface suspend functions for IO paths and inject dependencies rather than using singletons.
 - There is no automated formatter yet—use the IDE’s Kotlin reformatter before committing to keep diffs clean.
 

@@ -23,7 +23,7 @@ Build a TreeSize-inspired Terminal User Interface (TUI) application for scanning
 - Page Up/Down and Home/End navigation
 - Sort by size, name, or date with sort key hints
 - Color-coded sizes with percentage bars
-- Green background highlight for selected entry
+- Teal background highlight for selected entry
 - File and directory listing with symlink detection
 - Refresh current directory with intelligent cache preservation
 - Delete files/directories with confirmation dialog and progress spinner

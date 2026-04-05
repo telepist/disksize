@@ -50,6 +50,7 @@ src/
             │       ├── FakeFileSystemRepository.kt
             │       └── FakeFileSystemRepositoryTest.kt
             ├── domain/
+            │   ├── FileTreeStoreTest.kt
             │   ├── model/
             │   │   ├── FileNodeTest.kt
             │   │   ├── FileNodeTestHelper.kt
@@ -59,7 +60,10 @@ src/
             │       └── ScanDirectoryUseCaseTest.kt
             ├── presentation/
             │   ├── CrossPlatformPathTest.kt
-            │   └── ExplorerStateTest.kt
+            │   ├── DeriveExplorerStateTest.kt
+            │   ├── ExplorerStateTest.kt
+            │   ├── ExplorerStateTestHelpers.kt
+            │   └── ExplorerViewModelTest.kt
             ├── ui/
             │   ├── FrameFormattingTest.kt
             │   └── FrameTextTest.kt
@@ -120,30 +124,55 @@ class ScanDirectoryUseCaseTest {
 
     @Test
     fun `should scan directory and return result`() = runTest {
-        // Given
-        repository.addDirectory("/test/path", children = listOf(
-            FakeEntry("file1.txt", 1024),
-            FakeEntry("file2.txt", 2048)
-        ))
+        val testNode = createFileNode("/test", "test", isDirectory = true,
+            children = listOf(
+                createFileNode("/test/file1.txt", "file1.txt", size = 1024),
+                createFileNode("/test/file2.txt", "file2.txt", size = 2048)
+            ))
+        repository.addFile(testNode)
 
-        // When
-        val updates = useCase.scan("/test/path").toList()
+        val updates = useCase.scan("/test").toList()
 
-        // Then
         val completed = updates.filterIsInstance<ScanStatus.Completed>().single()
-        assertEquals("/test/path", completed.result.rootPath)
-        assertTrue(completed.result.fileCount > 0)
+        assertEquals("/test", completed.result.rootPath)
+        assertEquals(2, completed.result.fileCount)
+    }
+}
+```
+
+### ViewModel Tests
+Test presentation logic with `UnconfinedTestDispatcher` for synchronous execution:
+
+```kotlin
+class ExplorerViewModelTest {
+    private lateinit var repository: FakeFileSystemRepository
+    private lateinit var store: FileTreeStore
+    private lateinit var viewModel: ExplorerViewModel
+    private lateinit var vmScope: CoroutineScope
+
+    @BeforeTest
+    fun setup() {
+        repository = FakeFileSystemRepository()
+        store = FileTreeStore()
+        val dispatcher = UnconfinedTestDispatcher()
+        val scanUseCase = ScanDirectoryUseCase(repository, dispatcher)
+        val deleteUseCase = DeleteFileUseCase(repository)
+        vmScope = CoroutineScope(dispatcher)
+        viewModel = ExplorerViewModel(scanUseCase, deleteUseCase, store, vmScope)
+    }
+
+    @AfterTest
+    fun teardown() {
+        vmScope.cancel()
     }
 
     @Test
-    fun `should handle permission denied error`() = runTest {
-        // Given
-        repository.setErrorForPath("/restricted", IOException("Permission denied"))
+    fun `confirmDelete removes item from tree`() {
+        // setup tree, scan, select item...
+        viewModel.requestDelete()
+        viewModel.confirmDelete()
 
-        // When/Then
-        assertFailsWith<IOException> {
-            useCase.scan("/restricted").toList()
-        }
+        assertFalse(viewModel.state.value.browserItems.any { it.node.name == "target.txt" })
     }
 }
 ```

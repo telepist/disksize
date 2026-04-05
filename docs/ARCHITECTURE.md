@@ -1,39 +1,40 @@
 # DiskSize - Architecture Design
 
 ## Overview
-DiskSize follows a clean architecture approach with clear separation of concerns, designed for testability and cross-platform compatibility.
+DiskSize follows a clean architecture approach with clear separation of concerns, designed for testability and cross-platform compatibility. The system uses a reactive data flow: a single `FileTreeStore` owns the file tree model, mutations (scanning, deletion) go through the store, and the UI derives its state automatically.
 
 ## Architectural Principles
 1. **Platform Independence**: Core business logic is platform-agnostic
-2. **Dependency Inversion**: High-level modules don't depend on low-level modules
-3. **Single Responsibility**: Each class/module has one reason to change
-4. **Testability**: All components are easily testable in isolation
-5. **Immutability**: Prefer immutable data structures where possible
+2. **Reactive Single Source of Truth**: `FileTreeStore` owns the file tree; UI derives state from it
+3. **Dependency Inversion**: High-level modules don't depend on low-level modules
+4. **Single Responsibility**: Each class/module has one reason to change
+5. **Testability**: All components are easily testable in isolation — presentation logic lives in `ExplorerViewModel`, not in Compose
+6. **Immutability**: Prefer immutable data structures where possible
 
 ## Layer Architecture
 
 ```
 ┌─────────────────────────────────────────────┐
 │           UI Layer (Mosaic TUI)             │
-│  - Composable components                    │
-│  - User input handling                      │
-│  - View state management                    │
+│  - Thin Compose wrappers                    │
+│  - Collects StateFlow, delegates events     │
+│  - Pure rendering functions                 │
 └─────────────────────────────────────────────┘
                     │
                     ▼
 ┌─────────────────────────────────────────────┐
 │          Presentation Layer                 │
-│  - ViewModel / Presenter                    │
-│  - UI state transformation                  │
-│  - User action handling                     │
+│  - ExplorerViewModel (all user actions)     │
+│  - deriveExplorerState() (state derivation) │
+│  - ExplorerState, UiSelections, BrowserItem │
 └─────────────────────────────────────────────┘
                     │
                     ▼
 ┌─────────────────────────────────────────────┐
 │            Domain Layer                     │
-│  - Business logic                           │
-│  - Use cases / Interactors                  │
-│  - Domain models                            │
+│  - FileTreeStore (reactive tree model)      │
+│  - Use cases (scan, delete)                 │
+│  - Domain models (FileNode, FileTreeState)  │
 └─────────────────────────────────────────────┘
                     │
                     ▼
@@ -41,9 +42,28 @@ DiskSize follows a clean architecture approach with clear separation of concerns
 │            Data Layer                       │
 │  - Repository implementations               │
 │  - Platform-specific file system access     │
-│  - Data transformation                      │
 └─────────────────────────────────────────────┘
 ```
+
+## Data Flow
+
+```
+FileSystemRepository.scanDirectory()
+        │ Flow<DirectoryScanUpdate>
+        ▼
+ScanDirectoryUseCase.scanInto(store)
+        │ pushes updates
+        ▼
+FileTreeStore (StateFlow<FileTreeState>)
+        │ collected by ViewModel
+        ▼
+ExplorerViewModel
+        │ derives via deriveExplorerState(tree, ui)
+        ▼
+ExplorerState (StateFlow) → UI
+```
+
+Both scanning and deletion mutate the `FileTreeStore`. The store filters out paths deleted during an active scan, so deleted items never reappear from incoming scan snapshots.
 
 ## Core Components
 
@@ -51,48 +71,58 @@ DiskSize follows a clean architecture approach with clear separation of concerns
 
 #### Models
 ```kotlin
-// Core domain models
 data class FileNode(
     val path: String,
     val name: String,
     val size: Long,
     val isDirectory: Boolean,
-    val children: List<FileNode> = emptyList(),
+    val isSymlink: Boolean,
+    val children: List<FileNode>,
     val lastModified: Long,
-    val permissions: FilePermissions?
+    val cachedTotalSize: Long,   // O(1) aggregate lookups
+    val cachedFileCount: Int,
+    val cachedDirectoryCount: Int
 )
 
-data class ScanResult(
+data class FileTreeState(
     val rootPath: String,
-    val totalSize: Long,
-    val fileCount: Int,
-    val directoryCount: Int,
-    val rootNode: FileNode,
+    val rootNode: FileNode?,
+    val scanPhase: ScanPhase,        // IDLE, LOADING, SCANNING, COMPLETED, ERROR
+    val scannedPaths: Set<String>,
+    val scanProgress: ScanProgress?,
     val scanDurationMs: Long,
-    val errors: List<ScanError>
+    val errors: List<ScanError>,
+    val errorMessage: String?,
+    val scanStartTimeMark: TimeSource.Monotonic.ValueTimeMark?,
+    val lastPartialScannedBytes: Long
 )
 
-data class ScanError(
-    val path: String,
-    val message: String,
-    val type: ErrorType
-)
+data class ScanResult(...)   // derived from FileTreeState for display
+data class ScanError(...)
 ```
+
+#### FileTreeStore
+Reactive owner of the file tree. All mutations go through its methods:
+- `reset(path)` — start a new scan
+- `updateProgress(progress)` — update scan progress
+- `applyPartialTree(root, scannedPaths, errors)` — apply partial scan snapshot
+- `applyComplete(root, errors, durationMs)` — apply final scan result
+- `removeNode(path)` — remove a deleted item
+- `setError(message)` — set scan error state
+- `restore(savedState)` — restore from navigation history
 
 #### Use Cases
 ```kotlin
-interface ScanDirectoryUseCase {
-    fun scan(path: String): Flow<ScanStatus>
+class ScanDirectoryUseCase(
+    repository: FileSystemRepository,
+    scanDispatcher: CoroutineDispatcher = Dispatchers.Default  // injectable for tests
+) {
+    suspend fun scanInto(path: String, store: FileTreeStore)   // pushes into store
+    fun scan(path: String): Flow<ScanStatus>                   // standalone flow
 }
 
-The flow emits `ScanStatus.Progress` events with `ScanProgress` payloads as the traversal advances, followed by a terminal `ScanStatus.Completed` containing the `ScanResult`.
-
-interface GetDirectoryChildrenUseCase {
-    suspend fun execute(node: FileNode): Result<List<FileNode>>
-}
-
-interface CalculateSizesUseCase {
-    suspend fun execute(node: FileNode): Long
+class DeleteFileUseCase(repository: FileSystemRepository) {
+    suspend fun delete(path: String): DeletionResult
 }
 ```
 
@@ -100,53 +130,56 @@ interface CalculateSizesUseCase {
 
 #### Repository
 ```kotlin
-interface FileSystemRepository {
+abstract class FileSystemRepository {
     fun scanDirectory(path: String): Flow<DirectoryScanUpdate>
     suspend fun getFileInfo(path: String): Result<FileNode>
+    suspend fun delete(path: String): Result<DeletionStats>
     suspend fun exists(path: String): Boolean
     suspend fun isAccessible(path: String): Boolean
+    open fun classifyError(error: Throwable): ErrorType
 }
-
-`scanDirectory` streams indeterminate progress updates during the scan. Progress reports include files scanned, directories scanned, total bytes, and throughput (bytes/sec). This approach avoids the complexity and inaccuracy of pre-scan estimation while providing meaningful real-time feedback.
 ```
 
-#### Platform-Specific Implementation
-Each platform (macOS, Linux, Windows) will provide its own `FileSystemRepository` implementation using platform-specific APIs:
-- macOS/Linux: POSIX APIs
-- Windows: Windows APIs via MinGW
+#### Platform-Specific Implementations
+- `PosixFileSystemRepository` — macOS/Linux via POSIX APIs
+- `WindowsFileSystemRepository` — Windows via Win32 APIs
 
 ### Presentation Layer
 
-#### State Management
+#### ExplorerViewModel
+Owns all presentation logic — testable without Compose:
+- Navigation: `moveSelection()`, `toggleExpand()`, `expandOrEnter()`, `collapseOrParent()`, `navigateUp()`
+- Actions: `startScan()`, `refresh()`, `cycleSort()`, `requestDelete()`, `confirmDelete()`, `cancelDelete()`
+- Key handling: `handleKey(key, pageSize, onQuit)` — maps keys to actions with state guards
+- Spinner animation: `startSpinnerIfNeeded()`
+- Exposes `state: StateFlow<ExplorerState>` derived from `FileTreeStore.state` + `UiSelections`
+
+#### State Derivation
 ```kotlin
-data class MainScreenState(
-    val currentPath: String,
-    val currentNode: FileNode?,
-    val isScanning: Boolean,
-    val scanProgress: Float,
-    val sortOrder: SortOrder,
-    val error: String?
+// UI-local selections (not in the store)
+data class UiSelections(
+    selectedIndex, sortOrder, expandedPaths,
+    confirmDeleteItem, isDeletingInProgress, errorMessage, spinnerIndex
 )
 
-sealed class MainScreenEvent {
-    data class DirectorySelected(val path: String) : MainScreenEvent()
-    object NavigateUp : MainScreenEvent()
-    object NavigateDown : MainScreenEvent()
-    data class SortOrderChanged(val order: SortOrder) : MainScreenEvent()
-}
+// Derives the full UI state from tree model + UI selections
+fun deriveExplorerState(tree: FileTreeState, ui: UiSelections): ExplorerState
 ```
+
+`ExplorerState` is consumed by all rendering functions unchanged — the derivation is transparent to the UI layer.
 
 ### UI Layer
 
-#### Composable Components
-- `MainScreen`: Root composable, orchestrates entire UI and keyboard handling
-- `FramePrimitives`: Theme object (RGB palette), `frameLine()` (borderless with 1-char left padding), `horizontalRule()`, dialog border functions (rounded corners: ╭─╮│╰─╯)
-- `HeaderSection`: `headerLine()` — compact title + path on one line
-- `StatsSection`: `statsLine()` — stats left-aligned, sort indicator right-aligned
-- `DirectorySection`: Entry list with `▸` selector, eighth-block bars (▏▎▍▌▋▊▉█), tree connectors, size-coded colors
-- `StatusSection`: `statusLine()` — status left, key hints right (key labels bright, descriptions dim)
-- `ScreenBuilder`: Composes layout: header → stats → rule → content → rule → status
-- `ConfirmationDialog`: Centered dialogs with rounded corners for delete confirmation/progress
+Thin Compose wrappers with no business logic:
+- `DiskSizeApp` — collects `viewModel.state`, triggers initial scan, starts spinner, delegates key events
+- `MainScreen` — receives `ExplorerState` + key handler, renders frame
+
+Pure rendering functions (take `ExplorerState`, produce `FrameLine` lists):
+- `ScreenBuilder` — composes layout: header → stats → rule → content → rule → status
+- `DirectorySection` — entry list with selector, bars, tree connectors, size-coded colors
+- `StatusSection` — status left, key hints right
+- `HeaderSection`, `StatsSection` — compact header and stats lines
+- `ConfirmationDialog` — centered dialogs with rounded corners
 
 ## Cross-Platform Strategy
 
@@ -155,72 +188,40 @@ sealed class MainScreenEvent {
 src/
 ├── commonMain/           # Platform-independent code (~90%)
 │   └── kotlin/disksize/
-│       ├── data/         # Repository interfaces
-│       ├── domain/       # Business logic & models
-│       ├── presentation/ # UI state management
+│       ├── data/         # Repository base class, progress tracker
+│       ├── domain/       # FileTreeStore, use cases, models
+│       ├── presentation/ # ExplorerViewModel, ExplorerState, derivation
 │       ├── ui/           # TUI composable components
 │       └── util/         # Formatting utilities
 ├── commonTest/           # Common tests
 ├── posixMain/            # Shared macOS/Linux code (entry point, POSIX repository)
-│   └── kotlin/disksize/
-├── macosArm64Main/       # macOS ARM64 platform glue (FileNodePlatform)
+├── macosArm64Main/       # macOS ARM64 platform glue
 ├── macosX64Main/         # macOS x64 platform glue
 ├── linuxX64Main/         # Linux x64 platform glue
 ├── linuxArm64Main/       # Linux ARM64 platform glue
 └── mingwX64Main/         # Windows-specific (entry point, Win API repository)
-    └── kotlin/disksize/
-```
-
-### Platform Abstraction
-Use `expect`/`actual` mechanism for platform-specific implementations:
-
-```kotlin
-// commonMain
-expect class PlatformFileSystem() {
-    suspend fun listFiles(path: String): List<FileInfo>
-    suspend fun getSize(path: String): Long
-    suspend fun getPermissions(path: String): FilePermissions
-}
-
-// macosMain / linuxMain (POSIX)
-actual class PlatformFileSystem {
-    actual suspend fun listFiles(path: String): List<FileInfo> {
-        // POSIX implementation
-    }
-}
-
-// mingwMain (Windows)
-actual class PlatformFileSystem {
-    actual suspend fun listFiles(path: String): List<FileInfo> {
-        // Windows implementation
-    }
-}
 ```
 
 ## Concurrency Model
-- Use Kotlin Coroutines for async operations
-- File scanning runs in background coroutine
-- UI updates on main thread
-- Support cancellation of long-running scans
+- Kotlin Coroutines for all async operations
+- File scanning runs via injectable dispatcher (defaults to `Dispatchers.Default`)
+- `FileTreeStore` uses `MutableStateFlow` with atomic `update {}` for thread safety
+- `ExplorerViewModel` observes the store via `collect` and re-derives state
+- Cancellation-safe: cancelling a scan leaves the store with the last partial state
 
 ## Error Handling Strategy
 1. **Domain Layer**: Return `Result<T>` for operations that can fail
-2. **Presentation Layer**: Transform errors to user-friendly messages
-3. **UI Layer**: Display errors in status bar or modal
-4. **Graceful Degradation**: Skip inaccessible files, continue scanning
+2. **FileTreeStore**: `setError()` for scan failures (persists in `FileTreeState`)
+3. **Presentation Layer**: Transient UI errors (e.g., delete failure) in `UiSelections.errorMessage`; cleared on next key press
+4. **UI Layer**: Error shown in status bar (transient) or directory section (fatal, no scan data)
+5. **Graceful Degradation**: Skip inaccessible files during scan, accumulate warnings
 
 ## Testing Strategy
-- **Unit Tests**: Domain logic, use cases (pure functions)
-- **Integration Tests**: Repository with mock file system
-- **Component Tests**: UI components with test data
+- **Unit Tests**: Domain logic, use cases, FileTreeStore, ExplorerViewModel, state derivation
+- **Integration Tests**: Repository with FakeFileSystemRepository
+- **Component Tests**: UI rendering functions with test data
 - **Platform Tests**: Platform-specific code on actual platforms
-
-## Performance Considerations
-1. **Lazy Loading**: Don't load entire tree into memory
-2. **Streaming**: Process files as they're discovered
-3. **Caching**: Cache calculated sizes
-4. **Parallel Scanning**: Use multiple coroutines for I/O
-5. **Progress Reporting**: Yield periodically to update UI
+- ExplorerViewModel tested with `UnconfinedTestDispatcher` for synchronous execution
 
 ## Dependencies
 - **JetBrains Compose** 1.8.0: Compose Multiplatform framework
@@ -234,9 +235,3 @@ actual class PlatformFileSystem {
 - Shared build logic in common gradle scripts
 - Platform-specific dependencies only where needed
 - Debug and release configurations
-
-## Future Considerations
-- Plugin system for custom analyzers
-- Remote directory scanning (SSH/SFTP)
-- Database caching for large scans
-- Configuration persistence
