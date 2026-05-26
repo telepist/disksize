@@ -161,6 +161,35 @@ class ScanDirectoryUseCaseTest {
     }
 
     @Test
+    fun `refreshNode replaces subtree and forwards progress through the store`() = runTest {
+        val oldInner = createFileNode("/test/dir/old.txt", "old.txt", 100, false, false, emptyList(), 0L)
+        val initialDir = createFileNode("/test/dir", "dir", 0, true, false, listOf(oldInner), 0L)
+        val sibling = createFileNode("/test/keep.txt", "keep.txt", 42, false, false, emptyList(), 0L)
+        val root = createFileNode("/test", "test", 0, true, false, listOf(initialDir, sibling), 0L)
+        repository.addFile(root)
+
+        val store = disksize.domain.FileTreeStore()
+        store.applyComplete(root, emptyList(), 0)
+
+        // Now mutate disk: /test/dir gets new content.
+        val newInner = createFileNode("/test/dir/new.bin", "new.bin", 555, false, false, emptyList(), 0L)
+        val updatedDir = createFileNode("/test/dir", "dir", 0, true, false, listOf(newInner), 0L)
+        repository.addFile(updatedDir)
+
+        useCase.refreshNode("/test/dir", store)
+
+        val final = store.state.value
+        assertEquals(null, final.refreshingPath, "refreshingPath should be cleared after success")
+        assertEquals(null, final.scanProgress, "scanProgress should be cleared after success")
+        val dirNode = final.rootNode!!.children.first { it.name == "dir" }
+        assertEquals(1, dirNode.children.size)
+        assertEquals("new.bin", dirNode.children[0].name)
+        assertEquals(555, dirNode.totalSize())
+        // Sibling untouched.
+        assertTrue(final.rootNode!!.children.any { it.name == "keep.txt" })
+    }
+
+    @Test
     fun `should forward progress updates`() = runTest {
         val deepFile = createFileNode("/test/sub/file.txt", "file.txt", 100, false, false, emptyList(), 0L)
         val subDir = createFileNode("/test/sub", "sub", 0, true, false, listOf(deepFile), 0L)

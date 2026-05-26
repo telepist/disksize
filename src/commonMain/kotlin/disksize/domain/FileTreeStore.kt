@@ -97,6 +97,29 @@ class FileTreeStore {
         _state.value = savedState
     }
 
+    /** Mark that an in-place subtree refresh has started for [path]. Tree contents are preserved. */
+    fun beginSubtreeRefresh(path: String) {
+        _state.update { it.copy(refreshingPath = path) }
+    }
+
+    /** Replace the subtree at [path] with [newNode] and clear refresh-related transient state. */
+    fun completeSubtreeRefresh(path: String, newNode: FileNode) {
+        _state.update { current ->
+            val root = current.rootNode
+            val updatedRoot = when {
+                root == null -> null
+                root.path == path -> newNode
+                else -> replaceInTree(root, path, newNode) ?: root
+            }
+            current.copy(rootNode = updatedRoot, refreshingPath = null, scanProgress = null)
+        }
+    }
+
+    /** Clear refresh-related transient state without touching the tree (failure or cancellation). */
+    fun clearSubtreeRefresh() {
+        _state.update { it.copy(refreshingPath = null, scanProgress = null) }
+    }
+
     private fun filterDeletedPaths(root: FileNode): FileNode {
         if (deletedDuringScan.isEmpty()) return root
         return stripPaths(root, deletedDuringScan)
@@ -120,4 +143,31 @@ private fun stripPaths(node: FileNode, paths: Set<String>): FileNode {
         .filterNot { child -> paths.any { dp -> child.path == dp || child.path.isSubPathOf(dp) } }
         .map { stripPaths(it, paths) }
     return node.withChildren(updatedChildren)
+}
+
+/**
+ * Walk [node] looking for [targetPath] and replace that subtree with [replacement].
+ * Rebuilds the spine using [FileNode.withChildren] so cached aggregates stay consistent.
+ * Returns null if [targetPath] is not found under [node].
+ */
+internal fun replaceInTree(node: FileNode, targetPath: String, replacement: FileNode): FileNode? {
+    if (node.path == targetPath) return replacement
+    if (!node.isDirectory) return null
+    if (targetPath != node.path && !targetPath.isSubPathOf(node.path)) return null
+
+    var changed = false
+    val newChildren = node.children.map { child ->
+        if (changed) return@map child
+        if (child.path == targetPath) {
+            changed = true
+            replacement
+        } else if (child.isDirectory && (targetPath == child.path || targetPath.isSubPathOf(child.path))) {
+            val updated = replaceInTree(child, targetPath, replacement)
+            if (updated != null) {
+                changed = true
+                updated
+            } else child
+        } else child
+    }
+    return if (changed) node.withChildren(newChildren) else null
 }

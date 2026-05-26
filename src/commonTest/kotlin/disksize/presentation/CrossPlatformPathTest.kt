@@ -84,6 +84,26 @@ class CrossPlatformPathTest {
         assertTrue("/usr/bin".isSubPathOf("/usr"))
     }
 
+    @Test
+    fun `isSubPathOf tolerates trailing separator on parent`() {
+        assertTrue("C:\\Pelit".isSubPathOf("C:\\"))
+        assertTrue("C:\\Users\\foo".isSubPathOf("C:\\"))
+        assertTrue("/usr".isSubPathOf("/"))
+        assertTrue("/etc/hosts".isSubPathOf("/"))
+    }
+
+    @Test
+    fun `isSubPathOf rejects filesystem root as its own child`() {
+        assertFalse("C:\\".isSubPathOf("C:\\"))
+        assertFalse("/".isSubPathOf("/"))
+    }
+
+    @Test
+    fun `isSubPathOf handles trailing slash on regular directory parent`() {
+        assertTrue("/root/dir/sub".isSubPathOf("/root/dir/"))
+        assertTrue("C:\\Users\\foo\\bar".isSubPathOf("C:\\Users\\foo\\"))
+    }
+
     // ── Scanning detection with Windows paths ───────────────────────────
 
     @Test

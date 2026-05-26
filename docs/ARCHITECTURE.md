@@ -149,7 +149,7 @@ abstract class FileSystemRepository {
 #### ExplorerViewModel
 Owns all presentation logic — testable without Compose:
 - Navigation: `moveSelection()`, `toggleExpand()`, `expandOrEnter()`, `collapseOrParent()`, `navigateUp()`
-- Actions: `startScan()`, `refresh()`, `cycleSort()`, `requestDelete()`, `confirmDelete()`, `cancelDelete()`
+- Actions: `startScan()`, `refreshSelected()`, `refreshAll()`, `cycleSort()`, `requestDelete()`, `confirmDelete()`, `cancelDelete()`
 - Key handling: `handleKey(key, pageSize, onQuit)` — maps keys to actions with state guards
 - Spinner animation: `startSpinnerIfNeeded()`
 - Exposes `state: StateFlow<ExplorerState>` derived from `FileTreeStore.state` + `UiSelections`

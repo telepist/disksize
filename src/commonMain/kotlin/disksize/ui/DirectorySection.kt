@@ -119,8 +119,12 @@ private fun browserLines(
     val loadingDirPath = state.loadingDirectoryPath
     val liveBytes = state.scanningDirLiveBytes
 
+    // Live-byte size adjustments are only meaningful during a full scan: they rely on
+    // `lastPartialScannedBytes` being anchored by partial-tree emissions. A refresh leaves
+    // the rest of the tree intact and never emits partial trees, so we skip it here.
+    val applyLiveByteAdjustments = state.isScanInProgress
     val depth0ParentAdjustment: Long = run {
-        if (loadingDirPath == null) return@run 0L
+        if (!applyLiveByteAdjustments || loadingDirPath == null) return@run 0L
         for (item in items) {
             if (item.kind == BrowserItemKind.DIRECTORY && item.depth == 0 && !item.isScanned) {
                 val isScanning = loadingDirPath == item.node.path || loadingDirPath.isSubPathOf(item.node.path)
@@ -138,7 +142,7 @@ private fun browserLines(
         val item = items[index]
         val line = when (item.kind) {
             BrowserItemKind.DIRECTORY -> {
-                val isDepth0Scanning = item.isScanning && item.depth == 0
+                val isDepth0Scanning = applyLiveByteAdjustments && item.isScanning && item.depth == 0
                 val displaySize = if (isDepth0Scanning) liveBytes.coerceAtLeast(item.totalSize) else item.totalSize
                 val adjustedParentTotal = if (item.depth == 0 && depth0ParentAdjustment > 0L) {
                     item.parentTotalSize + depth0ParentAdjustment

@@ -80,8 +80,30 @@ class ExplorerViewModel(
         }
     }
 
-    fun refresh() {
-        if (!currentState.isScanInProgress) {
+    /** Refresh just the currently selected file/folder; falls back to a full rescan if nothing is selected. */
+    fun refreshSelected() {
+        val state = currentState
+        if (state.isAnyScanActive) return
+        val selectedPath = state.selectedItem?.node?.path
+        if (selectedPath == null) {
+            refreshAll()
+            return
+        }
+        scanJob?.cancel()
+        scanJob = scope.launch {
+            try {
+                scanDirectoryUseCase.refreshNode(selectedPath, store)
+            } catch (_: CancellationException) {
+                throw CancellationException()
+            } catch (throwable: Throwable) {
+                updateUi { it.copy(errorMessage = throwable.message ?: "Failed to refresh $selectedPath") }
+            }
+        }
+    }
+
+    /** Re-scan the root from scratch, replacing the entire tree. */
+    fun refreshAll() {
+        if (!currentState.isAnyScanActive) {
             startScan(currentState.currentPath)
         }
     }
@@ -206,9 +228,11 @@ class ExplorerViewModel(
         spinnerJob?.cancel()
         spinnerJob = scope.launch {
             while (true) {
-                val phase = store.state.value.scanPhase
+                val tree = store.state.value
+                val phase = tree.scanPhase
+                val refreshing = tree.refreshingPath != null
                 val deleting = ui.isDeletingInProgress
-                if (phase != ScanPhase.LOADING && phase != ScanPhase.SCANNING && !deleting) break
+                if (phase != ScanPhase.LOADING && phase != ScanPhase.SCANNING && !refreshing && !deleting) break
                 delay(120)
                 updateUi { it.copy(spinnerIndex = it.spinnerIndex + 1) }
             }
@@ -258,7 +282,8 @@ class ExplorerViewModel(
             "ArrowLeft", "h" -> { collapseOrParent(); true }
             "Backspace" -> { navigateUp(); true }
             "s", "S" -> { cycleSort(); true }
-            "r", "R" -> { if (!state.isScanInProgress) refresh(); true }
+            "r" -> { refreshSelected(); true }
+            "R" -> { refreshAll(); true }
             "Delete" -> { requestDelete(); true }
             "q", "Q" -> { onQuit(); true }
             else -> false

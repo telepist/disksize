@@ -17,7 +17,9 @@ data class FileTreeState(
     val errorMessage: String? = null,
     val scanStartTimeMark: TimeSource.Monotonic.ValueTimeMark? = null,
     /** Bytes scanned at the time of the last partial tree emission. */
-    val lastPartialScannedBytes: Long = 0L
+    val lastPartialScannedBytes: Long = 0L,
+    /** Path currently being refreshed in-place (subtree scan), or null if no partial refresh is active. */
+    val refreshingPath: String? = null
 )
 
 enum class ScanPhase { IDLE, LOADING, SCANNING, COMPLETED, ERROR }

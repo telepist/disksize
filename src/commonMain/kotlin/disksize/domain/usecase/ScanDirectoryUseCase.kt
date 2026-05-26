@@ -3,8 +3,10 @@ package disksize.domain.usecase
 import disksize.data.DirectoryScanUpdate
 import disksize.data.FileSystemRepository
 import disksize.domain.FileTreeStore
+import disksize.domain.model.FileNode
 import disksize.domain.model.ScanResult
 import disksize.domain.model.ScanStatus
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -40,6 +42,48 @@ class ScanDirectoryUseCase(
                     store.applyComplete(update.result.root, update.result.errors, duration)
                 }
             }
+        }
+    }
+
+    /**
+     * Refresh just the subtree at [path] in place, preserving the rest of [store]'s tree.
+     * Handles both files (single stat refresh) and directories (subtree rescan).
+     * On failure the store records a transient error but the existing tree is left intact.
+     */
+    suspend fun refreshNode(path: String, store: FileTreeStore) {
+        store.beginSubtreeRefresh(path)
+        try {
+            val info = repository.getFileInfo(path)
+            val node = info.getOrElse { error ->
+                throw error as? Exception ?: Exception(error.message ?: "Failed to refresh $path")
+            }
+            if (!node.isDirectory) {
+                store.completeSubtreeRefresh(path, node)
+                return
+            }
+
+            var finalNode: FileNode? = null
+            repository.scanDirectory(path).flowOn(scanDispatcher).collect { update ->
+                when (update) {
+                    is DirectoryScanUpdate.Progress -> store.updateProgress(update.progress)
+                    is DirectoryScanUpdate.PartialTree -> {
+                        currentCoroutineContext().ensureActive()
+                        finalNode = update.root
+                    }
+                    is DirectoryScanUpdate.Complete -> {
+                        currentCoroutineContext().ensureActive()
+                        finalNode = update.result.root
+                    }
+                }
+            }
+            val result = finalNode ?: throw Exception("Refresh of $path produced no result")
+            store.completeSubtreeRefresh(path, result)
+        } catch (cancel: CancellationException) {
+            store.clearSubtreeRefresh()
+            throw cancel
+        } catch (throwable: Throwable) {
+            store.clearSubtreeRefresh()
+            throw throwable
         }
     }
 

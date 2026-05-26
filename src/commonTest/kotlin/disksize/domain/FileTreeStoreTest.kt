@@ -246,6 +246,122 @@ class FileTreeStoreTest {
     }
 
     @Test
+    fun `beginSubtreeRefresh marks refreshingPath without clearing tree`() {
+        val store = FileTreeStore()
+        val root = directory("/test", "test", children = listOf(
+            directory("/test/a", "a", size = 100)
+        ))
+        store.applyComplete(root, emptyList(), 0)
+
+        store.beginSubtreeRefresh("/test/a")
+
+        val state = store.state.value
+        assertEquals("/test/a", state.refreshingPath)
+        assertNotNull(state.rootNode)
+        assertEquals(ScanPhase.COMPLETED, state.scanPhase)
+    }
+
+    @Test
+    fun `completeSubtreeRefresh replaces subtree and clears refreshingPath`() {
+        val store = FileTreeStore()
+        val root = directory("/test", "test", children = listOf(
+            directory("/test/a", "a", size = 100, children = listOf(
+                file("/test/a/old.txt", "old.txt", 50)
+            )),
+            file("/test/b.txt", "b.txt", 200)
+        ))
+        store.applyComplete(root, emptyList(), 0)
+        val originalTotal = store.state.value.rootNode!!.totalSize()
+
+        val refreshed = directory("/test/a", "a", size = 100, children = listOf(
+            file("/test/a/new.txt", "new.txt", 500)
+        ))
+        store.beginSubtreeRefresh("/test/a")
+        store.completeSubtreeRefresh("/test/a", refreshed)
+
+        val state = store.state.value
+        assertNull(state.refreshingPath)
+        val updatedA = state.rootNode!!.children.first { it.name == "a" }
+        assertEquals(1, updatedA.children.size)
+        assertEquals("new.txt", updatedA.children[0].name)
+        // Aggregates recomputed up the spine
+        assertTrue(state.rootNode!!.totalSize() > originalTotal)
+    }
+
+    @Test
+    fun `completeSubtreeRefresh on a file replaces just that leaf`() {
+        val store = FileTreeStore()
+        val root = directory("/test", "test", children = listOf(
+            file("/test/a.txt", "a.txt", 100),
+            file("/test/b.txt", "b.txt", 200)
+        ))
+        store.applyComplete(root, emptyList(), 0)
+
+        val refreshed = file("/test/a.txt", "a.txt", 999)
+        store.beginSubtreeRefresh("/test/a.txt")
+        store.completeSubtreeRefresh("/test/a.txt", refreshed)
+
+        val state = store.state.value
+        val updated = state.rootNode!!.children.first { it.name == "a.txt" }
+        assertEquals(999, updated.totalSize())
+        assertEquals(999 + 200, state.rootNode!!.totalSize())
+    }
+
+    @Test
+    fun `completeSubtreeRefresh on root replaces whole tree`() {
+        val store = FileTreeStore()
+        val initial = directory("/test", "test", children = listOf(
+            file("/test/a.txt", "a.txt", 100)
+        ))
+        store.applyComplete(initial, emptyList(), 0)
+
+        val refreshed = directory("/test", "test", children = listOf(
+            file("/test/b.txt", "b.txt", 500)
+        ))
+        store.beginSubtreeRefresh("/test")
+        store.completeSubtreeRefresh("/test", refreshed)
+
+        val state = store.state.value
+        assertNull(state.refreshingPath)
+        assertEquals(1, state.rootNode!!.children.size)
+        assertEquals("b.txt", state.rootNode!!.children[0].name)
+    }
+
+    @Test
+    fun `completeSubtreeRefresh for missing path is a no-op on tree`() {
+        val store = FileTreeStore()
+        val root = directory("/test", "test", children = listOf(
+            file("/test/a.txt", "a.txt", 100)
+        ))
+        store.applyComplete(root, emptyList(), 0)
+
+        store.beginSubtreeRefresh("/test/ghost")
+        store.completeSubtreeRefresh("/test/ghost", file("/test/ghost", "ghost", 1))
+
+        val state = store.state.value
+        assertNull(state.refreshingPath)
+        assertEquals(1, state.rootNode!!.children.size)
+        assertEquals("a.txt", state.rootNode!!.children[0].name)
+    }
+
+    @Test
+    fun `clearSubtreeRefresh clears the refreshing flag without touching the tree`() {
+        val store = FileTreeStore()
+        val root = directory("/test", "test", children = listOf(
+            file("/test/a.txt", "a.txt", 100)
+        ))
+        store.applyComplete(root, emptyList(), 0)
+
+        store.beginSubtreeRefresh("/test/a")
+        store.clearSubtreeRefresh()
+
+        val state = store.state.value
+        assertNull(state.refreshingPath)
+        // Tree untouched
+        assertEquals(1, state.rootNode!!.children.size)
+    }
+
+    @Test
     fun `errors are tracked through scan phases`() {
         val store = FileTreeStore()
         store.reset("/test")

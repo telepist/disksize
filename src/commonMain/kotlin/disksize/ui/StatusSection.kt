@@ -39,6 +39,18 @@ internal fun statusLine(state: ExplorerState, width: Int): FrameLine {
                 leftSegments += Segment(" ${SizeFormatter.format(progress.scannedBytes)}", Theme.pathText)
             }
         }
+        state.isRefreshing -> {
+            val refreshName = state.refreshingPath?.let { it.substringAfterLast('/').substringAfterLast('\\') }
+                ?.takeIf { it.isNotEmpty() }
+                ?: state.refreshingPath
+                ?: ""
+            leftSegments += Segment("Refreshing ", Theme.title)
+            if (refreshName.isNotEmpty()) {
+                leftSegments += Segment(refreshName, Theme.pathText)
+                leftSegments += Segment(" ", Theme.title)
+            }
+            leftSegments += Segment(state.spinnerFrame.toString(), Theme.spinner)
+        }
         state.errorMessage != null && state.scanResult == null -> {
             leftSegments += Segment("Error: ${state.errorMessage.take(innerWidth / 2)}", Theme.statusError)
         }
@@ -67,8 +79,10 @@ internal fun statusLine(state: ExplorerState, width: Int): FrameLine {
         rightSegments += Segment("  ")
         rightSegments += keyHint("s", "Sort")
         rightSegments += Segment("  ")
-        if (!state.isScanInProgress) {
+        if (!state.isAnyScanActive) {
             rightSegments += keyHint("r", "Refresh")
+            rightSegments += Segment("/", Theme.separator)
+            rightSegments += keyHint("R", "All")
             rightSegments += Segment("  ")
         }
         rightSegments += keyHint("Del", "Delete")

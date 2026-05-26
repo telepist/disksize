@@ -127,7 +127,8 @@ Always use 1024-based units (binary), show one decimal place for GB/TB.
 | Collapse/Parent | `←` or `h` | Collapse directory or go to parent |
 | Go Up One Level | `Backspace` | Navigate to parent directory |
 | Sort Toggle | `s` | Cycle sort options (Size ↓ → Name ↑ → Date ↓) |
-| Refresh | `r` | Rescan current directory and subdirectories |
+| Refresh Selected | `r` | Refresh just the selected file or folder in place |
+| Refresh All | `R` (Shift+R) | Full rescan of the root directory |
 | Delete | `Delete` | Delete selected file or directory |
 | Quit | `q` | Exit application |
 
@@ -150,7 +151,7 @@ Always use 1024-based units (binary), show one decimal place for GB/TB.
 5. User presses `Enter` to expand/collapse a directory in the tree view
 6. User presses `→`/`l` to expand or enter a directory (triggering a sub-scan if needed)
 7. User presses `←`/`h` to collapse a directory or `Backspace` to navigate to the parent
-8. User presses `s` to cycle sort order, `r` to refresh, `Delete` to delete
+8. User presses `s` to cycle sort order, `r` to refresh the selected entry (or `R` for a full rescan), `Delete` to delete
 9. Status bar shows scan duration and warnings (left-aligned) with key hints (right-aligned)
 10. User quits with `q`
 

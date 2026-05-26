@@ -15,6 +15,10 @@ data class ExplorerState(
     val scanResult: ScanResult? = null,
     val isLoading: Boolean = false,
     val isScanInProgress: Boolean = false,
+    val isRefreshing: Boolean = false,
+    val refreshingPath: String? = null,
+    /** Path that bounds the currently-active scan (full scan: rootPath; refresh: refreshingPath; null when idle). */
+    val activeScanRoot: String? = null,
     val scannedPaths: Set<String> = emptySet(),
     val loadingProgress: LoadingProgress? = null,
     val loadingDirectoryPath: String? = null,
@@ -43,6 +47,7 @@ data class ExplorerState(
     val selectedItem: BrowserItem? = browserItems.getOrNull(selectedIndex)
     val selectedDirectory: FileNode? = selectedItem?.takeIf { it.kind == BrowserItemKind.DIRECTORY }?.node
     val warningCount: Int = scanResult?.errors?.size ?: 0
+    val isAnyScanActive: Boolean = isScanInProgress || isRefreshing
     val scanningDirLiveBytes: Long
         get() = ((loadingProgress?.scannedBytes ?: 0L) - scanningDirBaseBytes).coerceAtLeast(0L)
 
@@ -74,6 +79,9 @@ fun deriveExplorerState(tree: FileTreeState, ui: UiSelections): ExplorerState {
     val rootNode = tree.rootNode
     val isLoading = tree.scanPhase == ScanPhase.LOADING
     val isScanInProgress = tree.scanPhase == ScanPhase.LOADING || tree.scanPhase == ScanPhase.SCANNING
+    val isRefreshing = tree.refreshingPath != null
+    // Unified scan-root concept: a full scan is bounded by rootPath, a refresh by refreshingPath.
+    val activeScanRoot: String? = tree.refreshingPath ?: tree.rootPath.takeIf { isScanInProgress && it.isNotEmpty() }
     val progress = tree.scanProgress?.let { LoadingProgress.fromDomain(it) }
     val loadingDirPath = tree.scanProgress?.currentDirectory
     val scanningDirBaseBytes = tree.lastPartialScannedBytes
@@ -96,9 +104,14 @@ fun deriveExplorerState(tree: FileTreeState, ui: UiSelections): ExplorerState {
 
     val items = if (rootNode != null) {
         buildBrowserItems(
-            rootNode, ui.sortOrder, ui.expandedPaths,
-            isScanInProgress, tree.scannedPaths,
-            loadingDirPath, scanningDirLiveBytes
+            root = rootNode,
+            sortOrder = ui.sortOrder,
+            expandedPaths = ui.expandedPaths,
+            isScanInProgress = isScanInProgress,
+            scannedPaths = tree.scannedPaths,
+            loadingDirectoryPath = loadingDirPath,
+            scanningDirLiveBytes = scanningDirLiveBytes,
+            activeScanRoot = activeScanRoot
         )
     } else {
         emptyList()
@@ -112,6 +125,9 @@ fun deriveExplorerState(tree: FileTreeState, ui: UiSelections): ExplorerState {
         scanResult = scanResult,
         isLoading = isLoading,
         isScanInProgress = isScanInProgress,
+        isRefreshing = isRefreshing,
+        refreshingPath = tree.refreshingPath,
+        activeScanRoot = activeScanRoot,
         scannedPaths = tree.scannedPaths,
         loadingProgress = progress,
         loadingDirectoryPath = loadingDirPath,
@@ -181,7 +197,8 @@ internal fun buildBrowserItems(
     isScanInProgress: Boolean = false,
     scannedPaths: Set<String> = emptySet(),
     loadingDirectoryPath: String? = null,
-    scanningDirLiveBytes: Long = 0L
+    scanningDirLiveBytes: Long = 0L,
+    activeScanRoot: String? = null
 ): List<BrowserItem> {
     val result = mutableListOf<BrowserItem>()
     val parentTotalSize = root.children.filter(FileNode::isDirectory).sumOf { child ->
@@ -193,8 +210,46 @@ internal fun buildBrowserItems(
             child.totalSize()
         }
     }
-    flattenChildren(root, sortOrder, expandedPaths, depth = 0, ancestorIsLast = emptyList(), parentTotalSize = parentTotalSize, isScanInProgress = isScanInProgress, scannedPaths = scannedPaths, loadingDirectoryPath = loadingDirectoryPath, scanningDirLiveBytes = scanningDirLiveBytes, result = result)
+    flattenChildren(
+        parent = root,
+        sortOrder = sortOrder,
+        expandedPaths = expandedPaths,
+        depth = 0,
+        ancestorIsLast = emptyList(),
+        parentTotalSize = parentTotalSize,
+        isScanInProgress = isScanInProgress,
+        scannedPaths = scannedPaths,
+        loadingDirectoryPath = loadingDirectoryPath,
+        scanningDirLiveBytes = scanningDirLiveBytes,
+        activeScanRoot = activeScanRoot,
+        result = result
+    )
     return result
+}
+
+/**
+ * Unified spinner rule: an item shows the "scanning" indicator iff
+ *   - the item is a directory,
+ *   - it has not already been recorded as scanned,
+ *   - it lies at or below the active scan root, and
+ *   - it is the scan root itself, or is an ancestor of (or equals) the currently-processing directory.
+ *
+ * Works for both a full scan (root bound = repository root) and a refresh (root bound = refresh target).
+ */
+internal fun isItemScanning(
+    path: String,
+    isDirectory: Boolean,
+    activeScanRoot: String?,
+    currentDirectory: String?,
+    scannedPaths: Set<String>
+): Boolean {
+    if (!isDirectory) return false
+    if (activeScanRoot == null) return false
+    if (path in scannedPaths) return false
+    if (path != activeScanRoot && !path.isSubPathOf(activeScanRoot)) return false
+    if (path == activeScanRoot) return true
+    if (currentDirectory == null) return false
+    return currentDirectory == path || currentDirectory.isSubPathOf(path)
 }
 
 private fun flattenChildren(
@@ -208,12 +263,15 @@ private fun flattenChildren(
     scannedPaths: Set<String>,
     loadingDirectoryPath: String?,
     scanningDirLiveBytes: Long = 0L,
+    activeScanRoot: String? = null,
     result: MutableList<BrowserItem>
 ) {
     val directories = parent.children.filter(FileNode::isDirectory).map { child ->
-        val isScanning = depth == 0 && isScanInProgress && loadingDirectoryPath != null &&
+        // Live byte size override is only meaningful for a full scan's depth-0 items, where partial-tree
+        // emissions anchor `lastPartialScannedBytes` against the cumulative `scanProgress.scannedBytes`.
+        val applyLiveBytes = depth == 0 && isScanInProgress && loadingDirectoryPath != null &&
             (loadingDirectoryPath == child.path || loadingDirectoryPath.isSubPathOf(child.path))
-        val effectiveSize = if (isScanning && scanningDirLiveBytes > 0) {
+        val effectiveSize = if (applyLiveBytes && scanningDirLiveBytes > 0) {
             scanningDirLiveBytes.coerceAtLeast(child.totalSize())
         } else {
             child.totalSize()
@@ -237,13 +295,13 @@ private fun flattenChildren(
             !isScanInProgress -> true
             else -> item.node.path in scannedPaths
         }
-        val isScanning = when {
-            item.kind != BrowserItemKind.DIRECTORY -> false
-            !isScanInProgress -> false
-            item.node.path in scannedPaths -> false
-            loadingDirectoryPath == null -> false
-            else -> loadingDirectoryPath == item.node.path || loadingDirectoryPath.isSubPathOf(item.node.path)
-        }
+        val isScanning = isItemScanning(
+            path = item.node.path,
+            isDirectory = item.kind == BrowserItemKind.DIRECTORY,
+            activeScanRoot = activeScanRoot,
+            currentDirectory = loadingDirectoryPath,
+            scannedPaths = scannedPaths
+        )
         val itemWithTree = item.copy(
             depth = depth,
             treePrefix = prefix,
@@ -267,6 +325,7 @@ private fun flattenChildren(
                 scannedPaths = scannedPaths,
                 loadingDirectoryPath = loadingDirectoryPath,
                 scanningDirLiveBytes = scanningDirLiveBytes,
+                activeScanRoot = activeScanRoot,
                 result = result
             )
         }
@@ -300,6 +359,17 @@ private val SPINNER_FRAMES = charArrayOf(
     '\u2839', '\u28B8', '\u28F0', '\u28E4', '\u28C6', '\u2847', '\u280F', '\u281B',
 ) // ⠹⢸⣰⣤⣆⡇⠏⠛ – 4 braille dots circling clockwise
 
-/** True when [this] path is a direct or nested child of [parent] (handles both `/` and `\`). */
-internal fun String.isSubPathOf(parent: String): Boolean =
-    startsWith("$parent/") || startsWith("$parent\\")
+/**
+ * True when [this] path is a direct or nested child of [parent] (handles both `/` and `\`).
+ * Trailing separators on [parent] are tolerated, so `"C:\\Pelit".isSubPathOf("C:\\")`
+ * and `"/usr".isSubPathOf("/")` both return true.
+ */
+internal fun String.isSubPathOf(parent: String): Boolean {
+    if (parent.isEmpty() || this == parent) return false
+    val trimmed = parent.trimEnd('/', '\\')
+    if (trimmed.isEmpty()) {
+        // Parent is pure separator(s) — a filesystem root. Any path beginning with a separator descends from it.
+        return startsWith('/') || startsWith('\\')
+    }
+    return startsWith("$trimmed/") || startsWith("$trimmed\\")
+}

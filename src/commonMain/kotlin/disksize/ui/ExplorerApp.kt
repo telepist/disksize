@@ -28,8 +28,8 @@ fun DiskSizeApp(
     }
 
     // Spinner animation
-    LaunchedEffect(state.isLoading, state.isScanInProgress, state.isDeletingInProgress) {
-        if (state.isLoading || state.isScanInProgress || state.isDeletingInProgress) {
+    LaunchedEffect(state.isLoading, state.isScanInProgress, state.isRefreshing, state.isDeletingInProgress) {
+        if (state.isLoading || state.isScanInProgress || state.isRefreshing || state.isDeletingInProgress) {
             viewModel.startSpinnerIfNeeded()
         }
     }

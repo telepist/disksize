@@ -80,7 +80,7 @@ class ExplorerViewModelTest {
     }
 
     @Test
-    fun `refresh triggers rescan`() {
+    fun `refreshAll triggers full rescan`() {
         addTestTree()
 
         viewModel.startScan("/root")
@@ -92,9 +92,112 @@ class ExplorerViewModelTest {
         ))
         repository.addFile(newRoot)
 
-        viewModel.refresh()
+        viewModel.refreshAll()
 
         assertEquals(1000, viewModel.state.value.totalSize)
+        assertEquals(1, viewModel.state.value.browserItems.size)
+    }
+
+    @Test
+    fun `refreshSelected updates only the selected directory subtree`() {
+        addTestTree()
+        viewModel.startScan("/root")
+
+        // Sibling files visible at root with their original sizes (300 + 100 + 50 inside dir).
+        assertEquals(450, viewModel.state.value.totalSize)
+
+        // Select the "dir" directory.
+        val dirIndex = viewModel.state.value.browserItems.indexOfFirst { it.node.name == "dir" }
+        assertTrue(dirIndex >= 0)
+        viewModel.moveSelection(dirIndex)
+
+        // Mutate disk so that only "dir" gains a new big file; a.txt/b.txt are untouched on disk
+        // but we want to verify they survive an in-place refresh of "dir".
+        val updatedDir = directory("/root/dir", "dir", children = listOf(
+            file("/root/dir/inner.txt", "inner.txt", 50),
+            file("/root/dir/added.bin", "added.bin", 700)
+        ))
+        repository.addFile(updatedDir)
+
+        viewModel.refreshSelected()
+
+        val state = viewModel.state.value
+        assertNull(state.refreshingPath)
+        // Sibling files preserved
+        assertTrue(state.browserItems.any { it.node.name == "a.txt" })
+        assertTrue(state.browserItems.any { it.node.name == "b.txt" })
+        // dir subtree updated: 50 + 700 = 750, plus root files 300+100 = 1150
+        assertEquals(1150, state.totalSize)
+    }
+
+    @Test
+    fun `refreshSelected on a file updates only its metadata`() {
+        addTestTree()
+        viewModel.startScan("/root")
+
+        val aIndex = viewModel.state.value.browserItems.indexOfFirst { it.node.name == "a.txt" }
+        viewModel.moveSelection(aIndex)
+
+        // Replace a.txt with a bigger version
+        repository.addFile(file("/root/a.txt", "a.txt", 800))
+
+        viewModel.refreshSelected()
+
+        val state = viewModel.state.value
+        assertNull(state.refreshingPath)
+        val refreshedA = state.browserItems.first { it.node.name == "a.txt" }
+        assertEquals(800, refreshedA.totalSize)
+        // 800 + 100 + 50 (dir/inner.txt) = 950
+        assertEquals(950, state.totalSize)
+    }
+
+    @Test
+    fun `refreshSelected sets error when path no longer accessible`() {
+        addTestTree()
+        viewModel.startScan("/root")
+
+        val aIndex = viewModel.state.value.browserItems.indexOfFirst { it.node.name == "a.txt" }
+        viewModel.moveSelection(aIndex)
+
+        repository.markInaccessible("/root/a.txt")
+        viewModel.refreshSelected()
+
+        val state = viewModel.state.value
+        assertNotNull(state.errorMessage)
+        assertNull(state.refreshingPath)
+        // Tree intact — a.txt still listed
+        assertTrue(state.browserItems.any { it.node.name == "a.txt" })
+    }
+
+    @Test
+    fun `handleKey r refreshes selected and R refreshes all`() {
+        addTestTree()
+        viewModel.startScan("/root")
+
+        // Select dir
+        val dirIndex = viewModel.state.value.browserItems.indexOfFirst { it.node.name == "dir" }
+        viewModel.moveSelection(dirIndex)
+
+        // Update only "dir" subtree on the fake disk
+        repository.addFile(directory("/root/dir", "dir", children = listOf(
+            file("/root/dir/inner.txt", "inner.txt", 50),
+            file("/root/dir/added.bin", "added.bin", 700)
+        )))
+
+        assertTrue(viewModel.handleKey("r", 10) {})
+
+        // dir subtree refreshed, root files preserved (300+100), dir now 750 → 1150
+        assertEquals(1150, viewModel.state.value.totalSize)
+
+        // Now swap the whole disk and trigger full refresh via 'R'
+        repository.clear()
+        repository.addFile(directory("/root", "root", children = listOf(
+            file("/root/only.txt", "only.txt", 42)
+        )))
+        assertTrue(viewModel.handleKey("R", 10) {})
+
+        assertEquals(42, viewModel.state.value.totalSize)
+        assertEquals(1, viewModel.state.value.browserItems.size)
     }
 
     // ── Selection ──

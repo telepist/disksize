@@ -112,7 +112,8 @@ DiskSize uses an RGB color palette to help you quickly identify large items:
 | `←` or `h`                | Collapse directory or go to parent          |
 | `Backspace`               | Navigate to the parent directory            |
 | `s`                       | Cycle sort order (Size ↓ → Name ↑ → Date ↓) |
-| `r`                       | Refresh (rescan) the current directory      |
+| `r`                       | Refresh the selected file or folder in place |
+| `R` (Shift+R)             | Refresh everything (full rescan from root)  |
 | `Delete`                  | Delete the selected file or directory       |
 | `q`                       | Quit the application                        |
 

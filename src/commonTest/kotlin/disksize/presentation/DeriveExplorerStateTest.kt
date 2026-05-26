@@ -235,6 +235,111 @@ class DeriveExplorerStateTest {
     }
 
     @Test
+    fun `refreshingPath marks matching browser item as scanning`() {
+        val root = directory("/test", "test", children = listOf(
+            directory("/test/a", "a", size = 200),
+            directory("/test/b", "b", size = 100)
+        ))
+        val tree = FileTreeState(
+            rootPath = "/test",
+            rootNode = root,
+            scanPhase = ScanPhase.COMPLETED,
+            refreshingPath = "/test/a"
+        )
+        val state = deriveExplorerState(tree, UiSelections())
+
+        assertTrue(state.isRefreshing)
+        assertEquals("/test/a", state.refreshingPath)
+
+        val itemA = state.browserItems.first { it.node.path == "/test/a" }
+        val itemB = state.browserItems.first { it.node.path == "/test/b" }
+        assertTrue(itemA.isScanning, "refreshing target should be marked scanning")
+        assertFalse(itemB.isScanning, "siblings should not be marked scanning")
+    }
+
+    @Test
+    fun `refreshingPath marks deeply nested target as scanning`() {
+        val deepChild = directory("/test/a/sub", "sub", size = 50)
+        val root = directory("/test", "test", children = listOf(
+            directory("/test/a", "a", size = 200, children = listOf(deepChild))
+        ))
+        val tree = FileTreeState(
+            rootPath = "/test",
+            rootNode = root,
+            scanPhase = ScanPhase.COMPLETED,
+            refreshingPath = "/test/a/sub"
+        )
+        val ui = UiSelections(expandedPaths = setOf("/test/a"))
+        val state = deriveExplorerState(tree, ui)
+
+        val itemA = state.browserItems.first { it.node.path == "/test/a" }
+        val itemSub = state.browserItems.first { it.node.path == "/test/a/sub" }
+        assertFalse(itemA.isScanning, "ancestor outside refresh root should not be scanning")
+        assertTrue(itemSub.isScanning, "deep refresh target should be marked scanning")
+    }
+
+    @Test
+    fun `refresh propagates spinner to nested subdirectory currently being scanned`() {
+        val deepInner = directory("/test/a/sub/leaf", "leaf", size = 25)
+        val sub = directory("/test/a/sub", "sub", size = 50, children = listOf(deepInner))
+        val root = directory("/test", "test", children = listOf(
+            directory("/test/a", "a", size = 200, children = listOf(sub)),
+            directory("/test/b", "b", size = 999)
+        ))
+        // Refresh of /test/a is in progress, scanner currently inside /test/a/sub/leaf.
+        val tree = FileTreeState(
+            rootPath = "/test",
+            rootNode = root,
+            scanPhase = ScanPhase.COMPLETED,
+            refreshingPath = "/test/a",
+            scanProgress = ScanProgress(
+                processedFiles = 1,
+                processedDirectories = 0,
+                scannedBytes = 25,
+                bytesPerSecond = 50,
+                currentDirectory = "/test/a/sub/leaf"
+            )
+        )
+        val ui = UiSelections(expandedPaths = setOf("/test/a", "/test/a/sub"))
+        val state = deriveExplorerState(tree, ui)
+
+        val itemA = state.browserItems.first { it.node.path == "/test/a" }
+        val itemSub = state.browserItems.first { it.node.path == "/test/a/sub" }
+        val itemLeaf = state.browserItems.first { it.node.path == "/test/a/sub/leaf" }
+        val itemB = state.browserItems.first { it.node.path == "/test/b" }
+
+        assertTrue(itemA.isScanning, "refresh root should show spinner")
+        assertTrue(itemSub.isScanning, "intermediate ancestor of currentDirectory should show spinner")
+        assertTrue(itemLeaf.isScanning, "currently-processing directory should show spinner")
+        assertFalse(itemB.isScanning, "siblings outside the refresh root should be quiet")
+        assertEquals("/test/a", state.activeScanRoot)
+    }
+
+    @Test
+    fun `full scan activeScanRoot equals rootPath while scanning`() {
+        val root = directory("/test", "test", children = listOf(
+            directory("/test/a", "a", size = 100)
+        ))
+        val tree = FileTreeState(
+            rootPath = "/test",
+            rootNode = root,
+            scanPhase = ScanPhase.SCANNING,
+            scanProgress = ScanProgress(0, 0, 0, 0, currentDirectory = "/test/a")
+        )
+        val state = deriveExplorerState(tree, UiSelections())
+        assertEquals("/test", state.activeScanRoot)
+        assertNull(state.refreshingPath)
+    }
+
+    @Test
+    fun `activeScanRoot is null when no scan is active`() {
+        val root = directory("/test", "test", children = listOf(file("/test/x", "x", 10)))
+        val tree = FileTreeState(rootPath = "/test", rootNode = root, scanPhase = ScanPhase.COMPLETED)
+        val state = deriveExplorerState(tree, UiSelections())
+        assertNull(state.activeScanRoot)
+    }
+
+    @Test
     fun `UI selections are passed through`() {
         val tree = FileTreeState(rootPath = "/test", scanPhase = ScanPhase.IDLE)
         val item = BrowserItem(
